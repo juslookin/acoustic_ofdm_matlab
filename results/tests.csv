@@ -1,0 +1,17 @@
+Test,Passed,Message
+test_modulations,1,PASS
+test_crc,1,PASS
+test_loaded_mapping,1,PASS
+test_ofdm,1,PASS
+test_cyclic_prefix,1,PASS
+test_real_channel_consistency,1,PASS
+test_covariance,1,PASS
+test_outage,1,PASS
+test_awgn,1,PASS
+test_psd,1,PASS
+test_deconvolution,1,PASS
+test_phase_tracking,1,PASS
+test_audio_packet,1,PASS
+test_sampling_clock,1,PASS
+test_packet_rejection,1,PASS
+test_adaptive_power,1,PASS

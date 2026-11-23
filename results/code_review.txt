@@ -1,0 +1,5 @@
+MATLAB checkcode static review
+Functions use base MATLAB; intentional growing summary rows are annotated AGROW.
+
+
+Scanned 55 MATLAB files; 0 analyzer messages.

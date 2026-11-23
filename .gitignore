@@ -1,0 +1,11 @@
+# MATLAB editor backups and local build artifacts.
+*.asv
+*.m~
+*.mex*
+slprj/
+codegen/
+
+# Operating-system metadata.
+.DS_Store
+Thumbs.db
+Desktop.ini

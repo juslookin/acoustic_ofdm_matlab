@@ -1,0 +1,7 @@
+OFFLINE ENTRY-POINT VALIDATION: SYNTHETIC FIXTURES ONLY
+Noise WAV -> PSD entry point: PASS
+Known real FIR sweep WAV -> deconvolution/decision entry point: PASS
+Two-tone WAV -> frequency/latency analysis entry point: PASS
+Saved synthetic audio -> file receiver: 64/64 CRC packets
+Synthetic measured-FIR/noise fixtures -> replay entry: 64/64 CRC packets
+No audio device was opened. Hardware I/O and repeated physical probes remain untested.
