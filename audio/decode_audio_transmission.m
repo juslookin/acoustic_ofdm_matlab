@@ -5,6 +5,8 @@ function result = decode_audio_transmission(recording, manifest, settings)
 receivedBytes = repmat(uint8(128), manifest.numberOfBytes, 1);
 passed = false(manifest.numberOfPackets, 1);
 diagnostics = cell(manifest.numberOfPackets, 1);
+referenceBits = cell2mat(cellfun(@(entry) entry.packetBits(:), manifest.packetMetadata(:).', ...
+    'UniformOutput', false));
 cursor = 1;
 errors = 0;
 comparedBits = 0;
@@ -15,9 +17,12 @@ for packetIndex = 1:manifest.numberOfPackets
     try
         decoded = decode_audio_frame(recording(cursor:end), manifest.payloadLengthWithHeader, settings);
         diagnostics{packetIndex} = decoded;
-        referenceBits = manifest.packetMetadata{packetIndex}.packetBits;
-        errors = errors + nnz(referenceBits ~= decoded.decodedBits);
-        comparedBits = comparedBits + numel(referenceBits);
+        % Compare with the closest transmitted packet, not the packet with
+        % the same position: one missed chirp would otherwise misalign every
+        % later comparison and report BER near 0.5 for a working link.
+        packetErrors = sum(referenceBits ~= decoded.decodedBits, 1);
+        errors = errors + min(packetErrors);
+        comparedBits = comparedBits + size(referenceBits, 1);
         cursor = cursor + decoded.lastSample + round(settings.interPacketSilence * settings.sampleRate) - 1;
         if decoded.passed
             header = double(decoded.payloadBytes(1:4));

@@ -11,10 +11,18 @@ function result = run_speaker_demo(mode, varargin)
 %                               recording of data/fixed_qpsk_transmit.wav).
 %                               Any rate/format audioread supports; resampled.
 %   run_speaker_demo('prepare') Write the transmit WAV only (for a phone or
-%                               another laptop to play); no sound.
-%   Add 'fec' to any mode for rate-1/2 convolutional coding, e.g.
-%   run_speaker_demo('prepare','fec') and run_speaker_demo('file',p,'fec').
-%   Transmitter and receiver must agree on 'fec'. It halves the data rate.
+%                               another laptop to play) into transmit/; no sound.
+%   run_speaker_demo('listen')  Record from the microphone (image length plus
+%                               25 s of margin) while another device plays the
+%                               transmit WAV, then decode. Does not play sound.
+% Options (any order, any mode):
+%   'fec'              Rate-1/2 convolutional coding with soft Viterbi
+%                      decoding. Sender and receiver must both use it.
+%   'picture', name    Send images/<name>.png instead of the checkerboard,
+%                      e.g. 'smiley'. The receiver should use the same name
+%                      (it only affects the BER comparison and file names).
+% Example: run_speaker_demo('prepare','fec','picture','smiley') on the
+% sender, run_speaker_demo('listen','fec','picture','smiley') on the receiver.
 % Output: result structure. Raw recordings, MAT files and an E7 diagnostics
 % figure are saved with a timestamp so every live attempt is kept as evidence.
 settings = startup_project();
@@ -24,6 +32,13 @@ end
 isFecFlag = cellfun(@(value) ischar(value) && strcmpi(value, 'fec'), varargin);
 settings.useFec = any(isFecFlag);
 varargin = varargin(~isFecFlag);
+pictureName = 'checkerboard';
+pictureIndex = find(cellfun(@(value) ischar(value) && strcmpi(value, 'picture'), varargin), 1);
+if ~isempty(pictureIndex)
+    assert(numel(varargin) > pictureIndex, 'Give a picture name after ''picture''.');
+    pictureName = varargin{pictureIndex + 1};
+    varargin(pictureIndex:pictureIndex + 1) = [];
+end
 if ~isempty(varargin)
     recordingPath = varargin{1};
 end
@@ -32,10 +47,16 @@ if settings.useFec
     fecTag = '_fec';
     fprintf('FEC on: rate-1/2 K=7 convolutional code with soft Viterbi decoding.\n');
 end
+imageBytes = load_picture(pictureName, settings);
+pictureTag = '';
+if ~strcmpi(pictureName, 'checkerboard')
+    [~, pictureTag] = fileparts(pictureName);
+    pictureTag = ['_', pictureTag];
+end
 if strcmp(mode, 'prepare')
-    imageBytes = make_demo_image(settings);
     [waveform, manifest] = make_audio_transmission(imageBytes, settings);
-    wavPath = fullfile(settings.paths.data, ['speaker', fecTag, '_transmit.wav']);
+    [~, baseName] = fileparts(pictureName);
+    wavPath = fullfile(settings.paths.transmit, [baseName, fecTag, '.wav']);
     audiowrite(wavPath, waveform, settings.sampleRate);
     fprintf('Saved %s (%.1f s, %d packets). Play it once; record with margin.\n', ...
         wavPath, manifest.durationSeconds, manifest.numberOfPackets);
@@ -43,10 +64,9 @@ if strcmp(mode, 'prepare')
     return;
 end
 if strcmp(mode, 'stress')
-    result = run_stress(settings);
+    result = run_stress(settings, imageBytes);
     return;
 end
-imageBytes = make_demo_image(settings);
 if strcmp(mode, 'check')
     % First packets only: same frame format and bytes as the full image.
     imageBytes = imageBytes(:, 1:settings.speakerCheckPackets);
@@ -58,6 +78,19 @@ switch mode
             manifest.durationSeconds);
         recording = play_record_audio(waveform, settings);
         sourceText = 'live speaker -> microphone';
+    case 'listen'
+        seconds = ceil(manifest.durationSeconds + settings.listenMarginSeconds);
+        if settings.audioInputDevice < 0
+            recorder = audiorecorder(settings.sampleRate, settings.audioBits, 1);
+        else
+            recorder = audiorecorder(settings.sampleRate, settings.audioBits, 1, settings.audioInputDevice);
+        end
+        fprintf('\n>>> RECORDING %d s. Press play on the other device now (within %d s).\n\n', ...
+            seconds, settings.listenMarginSeconds);
+        recordblocking(recorder, seconds);
+        recording = getaudiodata(recorder, 'double');
+        fprintf('Recording finished, decoding...\n');
+        sourceText = 'other device -> this microphone';
     case 'file'
         assert(exist('recordingPath', 'var') == 1, 'Provide the path of the recording.');
         [recording, fileRate] = audioread(recordingPath);
@@ -66,16 +99,20 @@ switch mode
             fprintf('Resampling recording from %d Hz to %d Hz.\n', fileRate, settings.sampleRate);
             recording = resample_audio(recording, fileRate, settings.sampleRate);
         end
-        % Normalize file level; phones often record quietly. Gain does not
-        % affect decoding because training symbols include the global gain.
-        recording = recording / max(max(abs(recording)), eps);
         [~, fileName, fileExtension] = fileparts(recordingPath);
         sourceText = ['file ', fileName, fileExtension];
     otherwise
-        error('Unknown mode. Use stress, check, image or file.');
+        error('Unknown mode. Use stress, check, image, prepare, listen or file.');
+end
+% Level and clipping are judged on the recording as captured. Decoding uses
+% a peak-normalized copy (phones often record quietly); gain does not affect
+% decoding because the training symbols include the overall gain.
+rawRecording = recording;
+if any(strcmp(mode, {'file', 'listen'}))
+    recording = recording / max(max(abs(recording)), eps);
 end
 result = decode_audio_transmission(recording, manifest, settings);
-summary = summarize_audio_result(result, recording, settings);
+summary = summarize_audio_result(result, rawRecording, settings);
 result.summary = summary;
 result.mode = mode;
 result.source = sourceText;
@@ -84,8 +121,8 @@ result.netPayloadBitsPerSecond = summary.packetsPassed * settings.packetPayloadB
 print_summary(summary, result, mode, settings);
 
 timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
-fileStem = ['speaker_', mode, fecTag, '_', timestamp];
-audiowrite(fullfile(settings.paths.data, [fileStem, '.wav']), max(min(recording, 1), -1), settings.sampleRate);
+fileStem = ['speaker_', mode, pictureTag, fecTag, '_', timestamp];
+audiowrite(fullfile(settings.paths.data, [fileStem, '.wav']), max(min(rawRecording, 1), -1), settings.sampleRate);
 save(fullfile(settings.paths.data, [fileStem, '.mat']), 'recording', 'result', 'manifest', 'settings', 'imageBytes');
 imwrite(result.receivedImage, fullfile(settings.paths.data, [fileStem, '_image.png']));
 figureHandle = plot_speaker_diagnostics(result, summary, imageBytes, settings, ...
@@ -144,7 +181,7 @@ if isstruct(entry) && isfield(entry, 'fecCorrections')
 end
 end
 
-function result = run_stress(settings)
+function result = run_stress(settings, imageBytes)
 %RUN_STRESS Offline prediction: real waveform through synthetic rooms and noise.
 % No audio device is opened. SNR is broadband recording SNR, as in the
 % fixed-QPSK simulation demo; the measured median per-carrier SNR is also kept.
@@ -152,7 +189,6 @@ stressTag = '';
 if settings.useFec
     stressTag = '_fec';
 end
-imageBytes = make_demo_image(settings);
 [waveform, manifest] = make_audio_transmission(imageBytes, settings);
 roomStream = RandStream('mt19937ar', 'Seed', settings.seed + 20);
 noiseStream = RandStream('mt19937ar', 'Seed', settings.seed + 21);

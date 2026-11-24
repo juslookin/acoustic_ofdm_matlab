@@ -55,7 +55,7 @@ fprintf(fileId, 'Synthetic PDP/noise are assumed, not measured. L-MMSE uses the 
 fprintf(fileId, 'Bootstrap units are independent channel frames. Wilson intervals are used for BPSK/QPSK independent AWGN/conditional bits; QAM uses independent-symbol CLT intervals. Trials sharing a fade are never treated as independent bits for BER uncertainty. Sparse/zero errors do not establish a strict 1e-3 BER guarantee.\n\n');
 fprintf(fileId, 'Hardware I/O, measured room/noise, physical clock drift, distance trials and adaptive acoustic feedback remain untested or unimplemented. No live 90%% CRC claim is made.\n');
 clear cleanup;
-vivaPath = fullfile(settings.projectRoot, 'VIVA_NOTES.md');
+vivaPath = fullfile(settings.projectRoot, 'docs', 'VIVA_NOTES.md');
 vivaText = fileread(vivaPath);
 marker = '<!-- GENERATED RESULTS BELOW -->';
 markerPosition = strfind(vivaText, marker);

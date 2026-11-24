@@ -1,289 +1,165 @@
-# Acoustic OFDM in base MATLAB
+# Sending pictures with sound
 
-This project implements and tests an OFDM simulation, LS and L-MMSE channel
-estimation, fixed QPSK versus naive/estimation-aware bit loading, and a real
-fixed-QPSK image waveform. It includes acoustic measurement routines. **A live
-over-the-air transfer (MacBook Pro built-in speaker to built-in microphone)
-decoded all 64 image packets with zero bit errors; see
-[Live over-the-air result](#live-over-the-air-result).** This is one short-range
-session in one room, not a characterisation across rooms or distances.
-Adaptive acoustic feedback is a remaining stretch goal.
+This project sends a small picture from one device to another using nothing
+but a speaker and a microphone. The picture is turned into a 23-second burst
+of audible tones, played out loud, recorded on the other side and turned back
+into the picture.
 
-Validated installation: **MATLAB R2026a, 26.1.0.3203278**, Windows 11. Installed
-products are MATLAB, Simulink and Control System Toolbox. `run_tests`, the
-speaker stress test and the live speaker demo also pass on MATLAB R2024a,
-macOS. The project uses
-**base MATLAB only**, including `fft`, `erfc`, `audiorecorder`, `audioplayer`,
-`audioread` and `audiowrite`. Communications, DSP, Signal Processing and Image
-Processing Toolboxes are not required. Other MATLAB releases were not tested;
-the plotting/export syntax requires R2020a or newer.
+Under the hood it is the same idea Wi-Fi and 4G use (OFDM), just slowed down
+to audio frequencies. Everything is written in plain MATLAB, with no toolboxes.
 
-## Run the complete software project
+![The pictures you can send](images/gallery.png)
 
-Clone the repository, or unzip the delivered project:
+## Results so far
 
-```powershell
-git clone https://github.com/juslookin/acoustic_ofdm_matlab.git
-cd acoustic_ofdm_matlab
-```
+| Test | Packets received | Notes |
+|---|---|---|
+| One MacBook, its own speaker into its own mic | **64 / 64** | No errors at all, about 2 kbit/s |
+| Phone speaker into MacBook mic, no error correction | 0 / 64 | About 1 bit in 80 arrives wrong, and one wrong bit spoils a packet |
+| Phone speaker into MacBook mic, **with error correction** | **63 / 64** | The code fixed around 19 bad bits per packet, about 1.4 kbit/s |
+| Windows laptop into MacBook | 0 / 64 | The laptop's built-in audio "enhancements" distort the signal |
 
-Open MATLAB, set its Current Folder to `acoustic_ofdm_matlab`, and run:
+![Sent picture and what arrived](docs/img/live_results.png)
 
-```matlab
-settings = startup_project();
-report = run_tests();
-results = run_all_simulations();
-```
+*Left to right: the picture we sent, what one MacBook received from itself,
+what arrived from a phone without error correction (nothing, so it stays
+gray), and what arrived with error correction. The thin gray line on the
+right is the one packet that did not make it.*
 
-`config.m` discovers the project root automatically, so moving or cloning the
-folder requires no code edits. `run_all_simulations` already runs the tests;
-calling `run_tests` separately is useful for a quick check. A full run takes a
-few minutes on the validated machine and overwrites reproducible software
-results. Each experiment resets its own documented RNG seed.
+Each picture is split into 64 packets of 64 bytes. Every packet carries a
+checksum, so the receiver either gets a packet exactly right or throws it
+away and leaves that strip gray. Nothing is ever shown wrong.
 
-PowerShell batch alternative, starting inside the project folder:
+## Getting started
 
-```powershell
-& 'C:\Program Files\MATLAB\R2026a\bin\matlab.exe' -batch "run_all_simulations;"
-```
-
-The agent's sandbox needed `MATLAB_PREFDIR` redirected to a writable workspace
-folder and MATLAB launched with access to its licensing service. This is an
-execution-environment issue; normal desktop MATLAB does not require changes
-to the modem. No preferences or licence files are bundled.
-
-## Read and inspect the results
-
-- `results/RESULTS.md`: actual recorded numbers and interpretation.
-- `VIVA_NOTES.md`: equations, examples, assumptions, code flow and generated results.
-- `results/reproducibility.mat`: complete settings, version and product inventory.
-- `results/*.csv`: readable numerical tables with intervals and trial counts.
-- `results/code_review.txt`: MATLAB static analyzer results.
-- `results/entry_point_validation.txt`: offline entry-point checks on synthetic
-  noise/sweep/tone fixtures and the saved waveform; no devices opened.
-- `results/adaptive.mat`: per-channel raw counts, column names, bootstrap indices
-  and paired aware-minus-naive goodput differences.
-- `figures/*.png` and `*.fig`: shareable plots and editable MATLAB figures.
-- `data/fixed_qpsk_transmit.wav`: real transmit waveform.
-- `data/fixed_qpsk_recording_simulation.wav`: synthetic recording with latency,
-  a real FIR and coloured noise.
-- `data/transmitted_image.png` and `data/received_image_simulation.png`: image demo.
-
-Trace one small packet without running the full experiments:
+You need MATLAB R2020a or newer. It has been run on R2024a (macOS) and R2026a
+(Windows). Open MATLAB in this folder and run the tests:
 
 ```matlab
-trace = trace_one_packet();
-trace.payloadBytes(1:8)
-trace.packetBits(1:16)
-trace.firstQpskSymbols
-trace.receiver.channelEstimate(1:8)
-trace.receiver.passed
+run_tests
 ```
 
-## Fixed-QPSK audio entry point
+All 19 tests should pass in about a minute. Nothing plays sound.
+
+## Try it on one laptop
+
+This plays the picture through your laptop speaker and records it with the
+laptop's own microphone. Turn the volume to about 50% first.
 
 ```matlab
-result = run_fixed_qpsk_demo('simulation'); % Real waveform, synthetic room
-manifest = run_fixed_qpsk_demo('prepare'); % Save WAV and manifest only
-result = run_fixed_qpsk_demo('hardware');   % Plays sound, records microphone
-result = run_fixed_qpsk_demo('file', 'C:/path/to/recording.wav');
+run_speaker_demo('check')                             % 1 second, quick sanity check
+run_speaker_demo('image', 'fec', 'picture', 'smiley') % the whole picture, ~23 s
 ```
 
-The default is the safe, reproducible simulation. The hardware mode requires a
-48 kHz input/output device and a suitable speaker/microphone arrangement. Set
-device IDs in `config.m` if defaults are unsuitable; inspect with
-`audiodevinfo`. Disable AGC, noise suppression, echo cancellation and OS audio
-enhancements. Keep playback volume moderate and avoid clipping. Capture mono
-or stereo WAV at 48 kHz; file mode averages stereo channels. The file receiver
-expects the deterministic demo image format and known image dimensions. It
-does not implement a general-purpose file-transfer protocol.
+When it finishes it prints how many packets arrived and saves a summary
+figure in `figures/` showing the sent and received picture side by side.
 
-Each audio packet contains 4 protected header bytes (16-bit packet ID and
-16-bit valid-data length), 64 image bytes and CRC32: **576 bits**, exactly
-three data OFDM symbols at the default pilot spacing. A frame also has a
-50 ms chirp, 30 ms guard, two full-band training symbols and a 30 ms gap.
-The 4096-byte image uses 64 frames. The receiver inserts gray pixels for
-missing/CRC-failed image packets. Synthetic replay BER uses known transmit
-bits; an actual receiver without the original can only report CRC results.
+## Try it with two devices
 
-Base MATLAB starts recording and playback asynchronously. It does not provide
-sample-synchronous duplex timing. Chirp/training synchronization handles start
-latency; pilot phase/slope tracking handles modest within-packet clock error.
-Large clock mismatch, intercarrier interference, clipping and nonlinear audio
-processing require further work. A synthetic 30 ppm clock test is included.
+One device plays a sound file, the other records and decodes. A phone
+works well as the sender. A MacBook works well as the receiver.
 
-## Over-the-air speaker demo
+1. **Get the sound file onto the sender.** Every picture already has one in
+   [`transmit/`](transmit/), for example `transmit/smiley_fec.wav`. AirDrop it
+   to an iPhone, or open it from GitHub on an Android phone. Do not send it
+   through WhatsApp or iMessage as a voice note, as they compress the audio.
+2. **Start listening on the Mac**, in MATLAB:
+   ```matlab
+   run_speaker_demo('listen', 'fec', 'picture', 'smiley')
+   ```
+3. **When it says `RECORDING`, press play on the phone.** You have about
+   25 seconds to start it, and exact timing does not matter. Hold the phone's
+   speaker 5 to 10 cm from the Mac's microphone (top left of the keyboard on
+   most MacBooks), with the volume around 60%.
+4. Keep quiet and still for about 25 seconds. The Mac then decodes the
+   recording and shows you the picture it received.
 
-`run_speaker_demo` wraps the same fixed-QPSK image link with level checks,
-timestamped raw recordings and a one-page diagnostics figure (`figures/E7_*`).
+If you would rather record with another app (QuickTime, a phone voice
+recorder), decode the file afterwards with
+`run_speaker_demo('file', 'my_recording.m4a', 'fec', 'picture', 'smiley')`.
+
+## Pictures
+
+The built-in pictures are `checkerboard`, `smiley`, `heart`, `ofdm` and
+`landscape`. They are all 64 by 64 pixels in grayscale, drawn by
+[`make_picture_library`](demo/make_picture_library.m).
+
+To send your own, drop any PNG into `images/`, then make its sound file:
 
 ```matlab
-run_speaker_demo('stress');  % No sound. Predicts CRC vs SNR in synthetic rooms.
-run_speaker_demo('check');   % Plays ~1 s (3 packets); prints level/SNR/CRC/advice.
-run_speaker_demo('image');   % Plays ~16 s; full 64-packet image.
-run_speaker_demo('file', 'recording.m4a'); % Phone recording, any sample rate.
+run_speaker_demo('prepare', 'fec', 'picture', 'my_cat')   % writes transmit/my_cat_fec.wav
 ```
 
-Procedure: allow MATLAB microphone access (macOS: System Settings > Privacy &
-Security > Microphone, then restart MATLAB). Disable microphone enhancements.
-Start at about 50% speaker volume. Repeat `check` while adjusting volume,
-distance and placement until it reports no clipping, median carrier SNR above
-15 dB and 3/3 CRC; then run `image` without moving anything. Every attempt,
-including failures, is saved in `data/speaker_*` and `figures/E7_speaker_*`.
+It is shrunk to 64 by 64 and turned gray, so simple, high-contrast pictures
+work best.
 
-Phone fallback: play `data/fixed_qpsk_transmit.wav` from the laptop and record
-it on a phone with any "enhance"/noise-reduction option off, then decode the
-file. Different device clocks are handled by per-packet chirp resynchronisation
-and pilot phase-slope tracking.
+## Why error correction matters
 
-The receiver starts its FFT window `timingBackoffSamples` (32) before the
-strongest arrival, so weaker early paths and timing jitter stay inside the CP.
-The SNR shown comes from the two training symbols and measures noise only;
-late reverberation beyond the 5.3 ms CP causes ISI that it does not include.
-The delay-profile panel shows how much channel energy falls outside the CP.
+Without error correction a packet is either perfect or lost. Between two
+devices the sound gets a little distorted on the way, and roughly one bit in a
+hundred comes out wrong. With 576 bits per packet, practically every packet
+then has at least one mistake, and the checksum rejects it.
 
-### Live over-the-air result
+Adding `'fec'` sends every bit twice in a clever, interleaved way (a
+convolutional code, the same family Wi-Fi uses). The receiver can then work
+out the original even when a few percent of the bits are wrong, and it gives
+less weight to bits that arrived on weak frequencies. The cost is a slower
+transfer: 23 seconds per picture instead of 16.
 
-Recorded 2026-11-24 on a MacBook Pro (macOS, MATLAB R2024a), built-in speaker
-to built-in microphone, default devices, no external hardware.
+The sender and receiver must agree: use `'fec'` on both or on neither.
 
-| Run | Packets CRC pass | BER | Median carrier SNR | EVM | Energy outside CP | Peak / clipping | Net rate |
-|---|---|---|---|---|---|---|---|
-| `check` (1.2 s) | 3/3 | 0 | 29.1 dB | -24.4 dB | -28.3 dB | 0.75 FS / none | 1302 bit/s |
-| `image` (16.0 s) | **64/64** | **0** | 30.0 dB | -24.2 dB | -28.2 dB | 0.80 FS / none | **2045 bit/s** |
+## When it does not work
 
-The received image is bit-identical to the transmitted one. Every data carrier
-between 2 and 8 kHz stayed above 25 dB SNR, and the measured latency was about
-0.52 s. Evidence: `figures/E7_speaker_image_20261124_220337.png`,
-`data/speaker_image_20261124_220337.{wav,mat}` and the matching
-`speaker_check_20261124_220252` files.
+- **Very few packets found.** The recording missed the start, or the sound
+  is too quiet. Start recording first and move the devices closer.
+- **Packets found but none pass.** Usually distortion. Lower the sender's
+  volume a little, move closer, and turn off any audio effects (on Windows:
+  Sound settings, your speaker, Audio enhancements off).
+- **The recording is silent.** Give MATLAB (or your terminal) microphone
+  access in System Settings, Privacy & Security, Microphone.
+- **Larger distances.** We have only tested at close range. In simulation,
+  error correction still copes with an echoey room at about 1 metre, but not
+  at 2 metres.
 
-The synthetic stress test (`results/speaker_stress.csv`,
-`figures/E7_speaker_stress.png`) predicts the limits: the direct-path and
-0.3 m desk rooms pass most packets, while the synthetic 1 m and 2 m reverberant
-rooms fail at every SNR because reverberation beyond the 5.3 ms CP caps the
-effective SNR near 10 dB and 4 dB. The live laptop channel kept almost all its
-energy inside the CP, consistent with the short-range cases.
+Each run saves the raw recording, the decoded picture and a diagnostics
+figure, so you can always go back and look at what happened.
 
-## Measurements (physical interaction required)
+## What is in the folders
 
-```matlab
-toneResult = run_audio_measurements('tones');
-quietResult = run_audio_measurements('noise');
-fanResult = run_audio_measurements('noise'); % Run again with fan on
-channelResult = run_audio_measurements('channel');
-variationResult = run_audio_measurements('variation');
-```
+| Folder | What lives there |
+|---|---|
+| `audio/` | Turning packets into sound and back: sync, timing, decoding |
+| `ofdm/` | The modem itself: modulation, checksums, error correction |
+| `images/` | The pictures you can send |
+| `transmit/` | Ready-to-play sound files, one per picture |
+| `data/` | Recordings and received pictures from real runs |
+| `figures/` | Plots from simulations and live runs |
+| `results/` | Numbers from the simulation experiments |
+| `docs/` | The detailed technical write-up and viva notes |
+| `channel/`, `measure/`, `statistics/`, `experiments/` | Room models, measurement tools and the simulation study |
 
-Noise recordings last 30 s. The exponential sweep lasts 2 s, followed by a
-0.4 s tail. Repeated variation probes last 0.12 s with a 0.2 s tail, 0.05 s
-record lead and tail, and a requested 0.75 s interval: minimum acquisition is
-0.42 s before overhead. Actual start times are saved; late probes are never
-overlapped. Twenty probes take about 15 s plus device overhead. Shape
-correlation is measured after strongest-arrival alignment; it is not a
-calibrated absolute-phase/Doppler coherence measurement.
+The main entry points are `run_tests`, `run_speaker_demo` and
+`run_all_simulations` (the full simulation study, a few minutes).
 
-Each physical run saves a timestamped MAT containing the recording, probe,
-settings and derived results. Plots show the most recent run; timestamped raw
-data remain available. Noise/channel/tones can also analyze a WAV offline:
+## Limits and next steps
 
-```matlab
-noiseResult = run_audio_measurements('noise', 'C:/path/to/noise.wav');
-channelResult = run_audio_measurements('channel', 'C:/path/to/sweep_recording.wav');
-```
+- Pictures are small (64 by 64, grayscale), and the data rate is modest.
+- Only short distances work reliably. Echoes longer than about 5 ms are the
+  main obstacle in bigger rooms.
+- Many laptops apply audio processing you cannot fully switch off, and that
+  hurts more than background noise does.
+- The receiver needs to know which picture size to expect. There is no
+  general file transfer yet.
 
-Offline channel analysis expects the exact sweep defined in `config.m` to
-have been played. Deconvolution uses regularized FFT least squares, with
-latency recorded separately and delays referenced to the strongest arrival.
-This replaces the reference's Farina inverse filter. Band-limited resolution,
-weaker precursor paths and a noise-biased late tail limit delay estimates.
-`measurement_decisions` suggests CP length/pilot spacing; these are estimates,
-not automatic configuration edits or a validated usable-band decision.
+Ideas we have not tried yet: adapting how many bits each frequency carries to
+the room, a longer guard time for echoey rooms, and colour pictures.
 
-Replay a measured FIR with scaled recorded noise after making measurements:
+## More detail
 
-```matlab
-result = run_measured_channel_simulation( ...
-    'C:/path/to/channel_TIMESTAMP.mat', ...
-    'C:/path/to/noise_TIMESTAMP.mat');
-```
-
-This is a convolution/replay simulation. It does not replace an over-the-air
-packet trial. The noise clip must cover the complete transmission; short
-clips are rejected instead of periodically repeated. Repeat measurements at
-0.5, 1 and 2 m to obtain distance evidence. No such data are included.
-
-## Model, power and fairness
-
-The FFT pair is unitary: `sqrt(N)*ifft(X)` and `fft(x)/sqrt(N)`. Each used
-positive-bin data symbol has ensemble energy Es=1; each pilot has Ep=1.
-The complex simulation uses proper-complex Gaussian taps with normalized PDP.
-The real acoustic waveform uses Hermitian symmetry and a real FIR; the mirror
-doubles energy without doubling information. An explicit test connects both
-models through the same positive-bin channel equation.
-
-Synthetic noise has known per-bin variance `Es*noiseShape/rho`, normalized so
-`mean(noiseShape)=1`; the SNR axis is `rho=Es/mean(noiseVariance)`, not the mean
-instantaneous faded SNR. The finite-FFT stationary noise model has exactly
-diagonal covariance by construction. The L-MMSE function also accepts full
-pilot-noise covariance. Measured real noise PSD maps approximately to positive
-unitary-FFT variance as `fs*oneSidedPSD/2`; finite-window cross-bin covariance
-can remain. No measured-noise diagonal model is claimed exact.
-
-Fixed QPSK, naive and aware loading share the channel, pilot noise, data noise
-and payload stream within each comparison. They have equal **per-carrier
-ensemble-energy limits**, identical pilots and frame duration. There is no
-power reallocation: off carriers save energy. Actual energy/budget is reported.
-This is not a comparison at exactly equal expended energy per realization.
-Random tail padding avoids biasing 16-QAM energy with all-zero symbols.
-
-One comb probe is followed by 12 data slots in simulation. Each fade is fixed
-throughout that frame; data pilots count against resources but do not update
-the estimate. Adaptive feedback is ideal and costs no extra slots. The audio
-receiver instead uses two full-band training symbols and per-symbol pilot
-tracking. These distinct protocols are explicitly documented.
-
-## Statistical interpretation and scope
-
-The central configuration uses 4000 independent channel realizations per
-estimation/fixed-fading point and 2400 per adaptive point. Channel bootstrap
-intervals preserve dependence among carriers, symbols and packets sharing a
-fade. Paired goodput differences resample the same frame triplets. Independent
-BPSK/QPSK AWGN/conditional trials use Wilson intervals; QAM uses a CLT across
-independent symbols. Pointwise 95% intervals are not simultaneous guarantees.
-
-Low-SNR adaptive points can have very few active packets despite many channel
-draws. Tables give actual compared bits and channels with packets. These are
-exploratory when sparse; zero observed errors do not prove target compliance.
-Bootstrap zero-event upper endpoints are `NaN`, explicitly unavailable. The
-effective-SNR formula is tested in a separate conditional-error experiment.
-
-Completed: tested simulation, both estimators, three loading policies, outage,
-CRC/BER/goodput, uncertainty, real fixed-QPSK image waveform, offline receiver,
-measurement/replay routines and saved experiments. Remaining: physical room
-measurements, hardware duplex/clock testing, live distance/90% CRC validation,
-measured-PDP statistical fitting, adaptive acoustic probe/feedback, robust
-general file-transfer framing and coding. No hardware function was invoked
-while validating this delivery. Synthetic signals are labelled throughout.
-
-## Source layout and design changes
-
-`config.m` is the central configuration. `ofdm/` follows mapping -> IFFT/CP ->
-FFT -> estimation/equalization -> decisions -> CRC. `channel/` separates
-proper-complex fading from real FIR convolution. `audio/` handles physical
-waveforms and synchronization. `measure/` estimates PSD, FIR and variation.
-`experiments/` saves figures/tables. `statistics/` contains interval routines.
-`run_tests.m` contains focused deterministic and statistical checks.
-
-Changes to the reference: MATLAB replaces Python; calendar/stop gates removed;
-off mode added; coloured covariance and FFT/power conventions made explicit;
-exact Gray 16-QAM theory used; CRC packet sizes fixed; feasible probe timing;
-regularized deconvolution replaces Farina inversion; separate complex/real
-channel models; statistical uncertainty uses independent channel frames;
-effective-SNR/adaptive advantage treated as hypotheses. Hardware-dependent
-results and adaptive acoustic transmission remain outside completed scope.
-
-Official MATLAB references: [FFT](https://www.mathworks.com/help/matlab/ref/fft.html),
-[IFFT](https://www.mathworks.com/help/matlab/ref/ifft.html),
-[audio recording](https://www.mathworks.com/help/matlab/ref/audiorecorder.html),
-[audio playback](https://www.mathworks.com/help/matlab/ref/audioplayer.html).
+- [docs/TECHNICAL.md](docs/TECHNICAL.md): the full technical reference
+  (signal design, simulations, statistics, measurement tools).
+- [docs/VIVA_NOTES.md](docs/VIVA_NOTES.md): equations and worked examples.
+- [docs/two_device_guide.pdf](docs/two_device_guide.pdf): a printable
+  two-page version of the two-device instructions.
+- [results/RESULTS.md](results/RESULTS.md): the numbers behind the
+  simulation figures.

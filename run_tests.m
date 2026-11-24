@@ -8,7 +8,7 @@ testFunctions = {@test_modulations, @test_crc, @test_loaded_mapping, ...
     @test_covariance, @test_outage, @test_awgn, @test_psd, ...
     @test_deconvolution, @test_phase_tracking, @test_audio_packet, ...
     @test_sampling_clock, @test_packet_rejection, @test_adaptive_power, ...
-    @test_resample_convolve, @test_fec};
+    @test_resample_convolve, @test_fec, @test_pictures};
 names = cell(numel(testFunctions), 1);
 passed = false(numel(testFunctions), 1);
 messages = cell(numel(testFunctions), 1);
@@ -220,6 +220,27 @@ for useFec = [false, true]
     end
 end
 assert(passes(2) == 5 && passes(1) < passes(2), 'FEC must beat uncoded at 4 dB.');
+end
+
+function test_pictures(settings)
+% Every picture loads at the image size; a full coded transmission of one
+% decodes exactly, and a missed first packet does not inflate the BER.
+files = dir(fullfile(settings.paths.images, '*.png'));
+names = [{'checkerboard'}, setdiff(erase({files.name}, '.png'), {'gallery'})];
+assert(numel(names) >= 5, 'Picture library missing: run make_picture_library.');
+for k = 1:numel(names)
+    picture = load_picture(names{k}, settings);
+    assert(isa(picture, 'uint8') && isequal(size(picture), settings.imageSize), names{k});
+end
+settings.useFec = true;
+picture = load_picture('smiley', settings);
+[waveform, manifest] = make_audio_transmission(picture, settings);
+result = decode_audio_transmission([waveform; zeros(2000, 1)], manifest, settings);
+assert(all(result.passed) && isequal(result.receivedImage, picture) && result.ber == 0);
+% Start the "recording" after the first frame: packet 1 is lost, BER stays 0.
+firstFrameEnd = round(settings.audioLeadingSilence * settings.sampleRate) + manifest.samplesPerFrameWithGap;
+result = decode_audio_transmission([waveform(firstFrameEnd + 1:end); zeros(2000, 1)], manifest, settings);
+assert(nnz(result.passed) == manifest.numberOfPackets - 1 && result.ber == 0);
 end
 
 function test_audio_packet(settings)

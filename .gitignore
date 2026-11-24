@@ -9,3 +9,6 @@ codegen/
 .DS_Store
 Thumbs.db
 Desktop.ini
+
+# Scratch recordings from manual tests (keep the timestamped evidence files).
+data/*_rx.wav

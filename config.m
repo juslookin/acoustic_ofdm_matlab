@@ -80,6 +80,7 @@ settings.timingBackoffSamples = 32;
 % Over-the-air speaker demo (run_speaker_demo). Rooms are SYNTHETIC stress
 % models (direct path + exponential diffuse tail), not measured rooms.
 settings.speakerCheckPackets = 3;
+settings.listenMarginSeconds = 25; % 'listen' mode: time to press play elsewhere
 settings.speakerQuietPeak = 0.05;
 settings.speakerClipLevel = 0.99;
 settings.speakerGoodSnrDb = 15;
@@ -110,4 +111,6 @@ settings.toneFrequencies = [1000, 5000];
 settings.paths.figures = fullfile(settings.projectRoot, 'figures');
 settings.paths.results = fullfile(settings.projectRoot, 'results');
 settings.paths.data = fullfile(settings.projectRoot, 'data');
+settings.paths.images = fullfile(settings.projectRoot, 'images');
+settings.paths.transmit = fullfile(settings.projectRoot, 'transmit');
 end
