@@ -2,13 +2,17 @@
 
 This project implements and tests an OFDM simulation, LS and L-MMSE channel
 estimation, fixed QPSK versus naive/estimation-aware bit loading, and a real
-fixed-QPSK image waveform. It includes acoustic measurement routines. **The
-saved audio demonstration uses a synthetic room. No live room measurement or
-over-the-air success is claimed.** Adaptive acoustic feedback is a remaining
-stretch goal.
+fixed-QPSK image waveform. It includes acoustic measurement routines. **A live
+over-the-air transfer (MacBook Pro built-in speaker to built-in microphone)
+decoded all 64 image packets with zero bit errors; see
+[Live over-the-air result](#live-over-the-air-result).** This is one short-range
+session in one room, not a characterisation across rooms or distances.
+Adaptive acoustic feedback is a remaining stretch goal.
 
 Validated installation: **MATLAB R2026a, 26.1.0.3203278**, Windows 11. Installed
-products are MATLAB, Simulink and Control System Toolbox. The project uses
+products are MATLAB, Simulink and Control System Toolbox. `run_tests`, the
+speaker stress test and the live speaker demo also pass on MATLAB R2024a,
+macOS. The project uses
 **base MATLAB only**, including `fft`, `erfc`, `audiorecorder`, `audioplayer`,
 `audioread` and `audiowrite`. Communications, DSP, Signal Processing and Image
 Processing Toolboxes are not required. Other MATLAB releases were not tested;
@@ -137,6 +141,29 @@ strongest arrival, so weaker early paths and timing jitter stay inside the CP.
 The SNR shown comes from the two training symbols and measures noise only;
 late reverberation beyond the 5.3 ms CP causes ISI that it does not include.
 The delay-profile panel shows how much channel energy falls outside the CP.
+
+### Live over-the-air result
+
+Recorded 2026-11-24 on a MacBook Pro (macOS, MATLAB R2024a), built-in speaker
+to built-in microphone, default devices, no external hardware.
+
+| Run | Packets CRC pass | BER | Median carrier SNR | EVM | Energy outside CP | Peak / clipping | Net rate |
+|---|---|---|---|---|---|---|---|
+| `check` (1.2 s) | 3/3 | 0 | 29.1 dB | -24.4 dB | -28.3 dB | 0.75 FS / none | 1302 bit/s |
+| `image` (16.0 s) | **64/64** | **0** | 30.0 dB | -24.2 dB | -28.2 dB | 0.80 FS / none | **2045 bit/s** |
+
+The received image is bit-identical to the transmitted one. Every data carrier
+between 2 and 8 kHz stayed above 25 dB SNR, and the measured latency was about
+0.52 s. Evidence: `figures/E7_speaker_image_20261124_220337.png`,
+`data/speaker_image_20261124_220337.{wav,mat}` and the matching
+`speaker_check_20261124_220252` files.
+
+The synthetic stress test (`results/speaker_stress.csv`,
+`figures/E7_speaker_stress.png`) predicts the limits: the direct-path and
+0.3 m desk rooms pass most packets, while the synthetic 1 m and 2 m reverberant
+rooms fail at every SNR because reverberation beyond the 5.3 ms CP caps the
+effective SNR near 10 dB and 4 dB. The live laptop channel kept almost all its
+energy inside the CP, consistent with the short-range cases.
 
 ## Measurements (physical interaction required)
 
