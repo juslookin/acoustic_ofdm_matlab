@@ -108,6 +108,36 @@ latency; pilot phase/slope tracking handles modest within-packet clock error.
 Large clock mismatch, intercarrier interference, clipping and nonlinear audio
 processing require further work. A synthetic 30 ppm clock test is included.
 
+## Over-the-air speaker demo
+
+`run_speaker_demo` wraps the same fixed-QPSK image link with level checks,
+timestamped raw recordings and a one-page diagnostics figure (`figures/E7_*`).
+
+```matlab
+run_speaker_demo('stress');  % No sound. Predicts CRC vs SNR in synthetic rooms.
+run_speaker_demo('check');   % Plays ~1 s (3 packets); prints level/SNR/CRC/advice.
+run_speaker_demo('image');   % Plays ~16 s; full 64-packet image.
+run_speaker_demo('file', 'recording.m4a'); % Phone recording, any sample rate.
+```
+
+Procedure: allow MATLAB microphone access (macOS: System Settings > Privacy &
+Security > Microphone, then restart MATLAB). Disable microphone enhancements.
+Start at about 50% speaker volume. Repeat `check` while adjusting volume,
+distance and placement until it reports no clipping, median carrier SNR above
+15 dB and 3/3 CRC; then run `image` without moving anything. Every attempt,
+including failures, is saved in `data/speaker_*` and `figures/E7_speaker_*`.
+
+Phone fallback: play `data/fixed_qpsk_transmit.wav` from the laptop and record
+it on a phone with any "enhance"/noise-reduction option off, then decode the
+file. Different device clocks are handled by per-packet chirp resynchronisation
+and pilot phase-slope tracking.
+
+The receiver starts its FFT window `timingBackoffSamples` (32) before the
+strongest arrival, so weaker early paths and timing jitter stay inside the CP.
+The SNR shown comes from the two training symbols and measures noise only;
+late reverberation beyond the 5.3 ms CP causes ISI that it does not include.
+The delay-profile panel shows how much channel energy falls outside the CP.
+
 ## Measurements (physical interaction required)
 
 ```matlab

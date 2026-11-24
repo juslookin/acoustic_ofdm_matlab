@@ -7,7 +7,8 @@ testFunctions = {@test_modulations, @test_crc, @test_loaded_mapping, ...
     @test_ofdm, @test_cyclic_prefix, @test_real_channel_consistency, ...
     @test_covariance, @test_outage, @test_awgn, @test_psd, ...
     @test_deconvolution, @test_phase_tracking, @test_audio_packet, ...
-    @test_sampling_clock, @test_packet_rejection, @test_adaptive_power};
+    @test_sampling_clock, @test_packet_rejection, @test_adaptive_power, ...
+    @test_resample_convolve};
 names = cell(numel(testFunctions), 1);
 passed = false(numel(testFunctions), 1);
 messages = cell(numel(testFunctions), 1);
@@ -225,4 +226,17 @@ payload = uint8(randi([0, 255], 1024, 1));
 metrics = evaluate_adaptive_frame(ones(carriers, 1), zeros(carriers, 1), ones(carriers, 1), ...
     ones(carriers, 1), dataPositions, noise, payload, settings, 'aware');
 assert(metrics(2) == 0 && metrics(5) == 0 && metrics(6) == 1 && metrics(8) == 0);
+end
+
+function test_resample_convolve(settings)
+% Inputs: settings; output: assertion. FFT convolution equals conv, and
+% band-limited resampling 48 -> 44.1 -> 48 kHz preserves an in-band tone.
+signal = randn(5000, 1);
+taps = randn(300, 1);
+assert(max(abs(fft_convolve(signal, taps) - conv(signal, taps))) < 1e-9);
+time = (0:47999).' / settings.sampleRate;
+tone = sin(2 * pi * 3000 * time) .* (0.5 - 0.5 * cos(2 * pi * (0:47999).' / 47999));
+roundTrip = resample_audio(resample_audio(tone, 48000, 44100), 44100, 48000);
+assert(numel(roundTrip) == numel(tone));
+assert(max(abs(roundTrip - tone)) < 1e-3);
 end

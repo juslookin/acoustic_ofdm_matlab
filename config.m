@@ -67,6 +67,22 @@ settings.demoSnrDb = 32;
 settings.demoChannel = [1; zeros(23, 1); 0.25; zeros(35, 1); -0.12];
 settings.demoDelaySamples = 137;
 settings.demoNoiseCoefficient = 0.7;
+% Start the FFT window this many samples inside the CP, before the strongest
+% arrival. Weaker early paths and timing jitter then stay inside the CP; the
+% resulting linear phase is part of the training channel estimate.
+settings.timingBackoffSamples = 32;
+
+% Over-the-air speaker demo (run_speaker_demo). Rooms are SYNTHETIC stress
+% models (direct path + exponential diffuse tail), not measured rooms.
+settings.speakerCheckPackets = 3;
+settings.speakerQuietPeak = 0.05;
+settings.speakerClipLevel = 0.99;
+settings.speakerGoodSnrDb = 15;
+settings.stressSnrDb = [10, 15, 20, 25, 30, 40];
+settings.stressClockPpm = 20;
+settings.stressRoomNames = {'Direct path only', 'Desk 0.3 m', 'Room 1 m', 'Room 2 m'};
+settings.stressRoomRt60 = [0, 0.3, 0.4, 0.5];
+settings.stressRoomDrrDb = [Inf, 12, 4, -2];
 
 settings.noiseRecordingSeconds = 30;
 settings.psdWindowLength = 4096;
