@@ -234,6 +234,9 @@ function test_resample_convolve(settings)
 signal = randn(5000, 1);
 taps = randn(300, 1);
 assert(max(abs(fft_convolve(signal, taps) - conv(signal, taps))) < 1e-9);
+% Direct-path-only room is a scalar FIR; output must stay a column.
+assert(isequal(size(fft_convolve(signal, 1)), [numel(signal), 1]));
+assert(max(abs(fft_convolve(signal, 1) - signal(:))) < 1e-12);
 time = (0:47999).' / settings.sampleRate;
 tone = sin(2 * pi * 3000 * time) .* (0.5 - 0.5 * cos(2 * pi * (0:47999).' / 47999));
 roundTrip = resample_audio(resample_audio(tone, 48000, 44100), 44100, 48000);
