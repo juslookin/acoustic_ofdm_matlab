@@ -16,3 +16,4 @@ test_sampling_clock,1,PASS
 test_packet_rejection,1,PASS
 test_adaptive_power,1,PASS
 test_resample_convolve,1,PASS
+test_fec,1,PASS

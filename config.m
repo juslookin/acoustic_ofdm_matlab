@@ -17,6 +17,11 @@ settings.targetBer = 1e-3;
 settings.modulationBits = [0, 1, 2, 4]; % 0 = off; then BPSK, QPSK, 16-QAM.
 settings.packetPayloadBytes = 64;
 settings.crcBits = 32;
+% Optional forward error correction for the audio link (run_speaker_demo
+% 'fec' flag): rate-1/2 K=7 convolutional code, block interleaver, soft
+% Viterbi. Off by default so the uncoded results stay reproducible.
+settings.useFec = false;
+settings.fecInterleaverColumns = 16;
 settings.imageSize = [64, 64];
 settings.dataSymbolsPerFrame = 12;
 settings.trainingSymbols = 2;

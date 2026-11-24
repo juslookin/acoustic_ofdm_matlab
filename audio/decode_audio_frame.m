@@ -15,7 +15,7 @@ searchRecording = recording(firstCandidate:lastCandidate + numel(knownTraining) 
 ofdmStart = max(1, firstCandidate + bestIndex - 1 - settings.timingBackoffSamples);
 [pilotPositions, dataPositions] = carrier_layout(numel(settings.usedBins), settings.pilotSpacing);
 packetLengthBits = payloadLength * 8 + settings.crcBits;
-numberOfDataSymbols = ceil(packetLengthBits / (2 * numel(dataPositions)));
+numberOfDataSymbols = audio_data_symbols(packetLengthBits, settings);
 numberOfOfdmSymbols = settings.trainingSymbols + numberOfDataSymbols;
 lastSample = ofdmStart + numberOfOfdmSymbols * (settings.fftSize + settings.cyclicPrefixLength) - 1;
 assert(lastSample <= numel(recording), 'Recording ends before the packet.');
@@ -30,14 +30,32 @@ dataGrid = receivedGrid(:, settings.trainingSymbols+1:end);
 safeEstimate = channelEstimate;
 safeEstimate(abs(safeEstimate) < settings.equalizerFloor) = settings.equalizerFloor;
 equalized = correctedGrid(dataPositions, :) ./ safeEstimate(dataPositions) / sqrt(settings.symbolEnergy);
-decodedBits = demap_symbols(equalized(:), 2);
+positiveBinSnr = abs(channelEstimate).^2 * settings.symbolEnergy ./ noiseVariance;
+fecCorrections = NaN;
+if settings.useFec
+    % QPSK soft bits: sign from the equalized symbol, reliability from the
+    % carrier SNR, so bits on faded carriers count for less in Viterbi.
+    carrierSnr = repmat(positiveBinSnr(dataPositions), 1, size(equalized, 2));
+    softBits = [real(equalized(:)).'; imag(equalized(:)).'] .* [carrierSnr(:).'; carrierSnr(:).'];
+    softBits = softBits(:);
+    deinterleaved = zeros(size(softBits));
+    deinterleaved(fec_interleaver(numel(softBits), settings.fecInterleaverColumns)) = softBits;
+    decodedBits = fec_decode(deinterleaved, packetLengthBits);
+    % Coded bits the decoder had to flip: a receiver-side error count that
+    % needs no knowledge of the transmitted data.
+    codedLength = 2 * (packetLengthBits + 6);
+    fecCorrections = nnz((deinterleaved(1:codedLength) < 0) ~= fec_encode(decodedBits));
+else
+    decodedBits = demap_symbols(equalized(:), 2);
+end
 [passed, bytes] = check_packet(decodedBits(1:packetLengthBits));
 result.passed = passed;
 result.payloadBytes = bytes;
 result.decodedBits = decodedBits(1:packetLengthBits);
 result.channelEstimate = channelEstimate;
 result.noiseVariance = noiseVariance;
-result.positiveBinSnr = abs(channelEstimate).^2 * settings.symbolEnergy ./ noiseVariance;
+result.positiveBinSnr = positiveBinSnr;
+result.fecCorrections = fecCorrections;
 result.phaseParameters = phaseParameters;
 result.equalizedSymbols = equalized;
 result.preambleStart = preambleStart;

@@ -5,8 +5,14 @@ function [waveform, metadata] = make_audio_frame(payloadBytes, settings)
 [pilotPositions, dataPositions] = carrier_layout(numel(settings.usedBins), settings.pilotSpacing);
 packetBits = make_packet(payloadBytes);
 bitsPerOfdmSymbol = 2 * numel(dataPositions);
-numberOfDataSymbols = ceil(numel(packetBits) / bitsPerOfdmSymbol);
-paddedBits = [packetBits; false(numberOfDataSymbols * bitsPerOfdmSymbol - numel(packetBits), 1)];
+numberOfDataSymbols = audio_data_symbols(numel(packetBits), settings);
+if settings.useFec
+    codedBits = fec_encode(packetBits);
+    paddedBits = [codedBits; false(numberOfDataSymbols * bitsPerOfdmSymbol - numel(codedBits), 1)];
+    paddedBits = paddedBits(fec_interleaver(numel(paddedBits), settings.fecInterleaverColumns));
+else
+    paddedBits = [packetBits; false(numberOfDataSymbols * bitsPerOfdmSymbol - numel(packetBits), 1)];
+end
 dataGrid = zeros(numel(settings.usedBins), numberOfDataSymbols);
 dataGrid(pilotPositions, :) = sqrt(settings.pilotEnergy);
 dataGrid(dataPositions, :) = reshape(sqrt(settings.symbolEnergy) * modulate_bits(paddedBits, 2), numel(dataPositions), []);

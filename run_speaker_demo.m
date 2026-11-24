@@ -1,4 +1,4 @@
-function result = run_speaker_demo(mode, recordingPath)
+function result = run_speaker_demo(mode, varargin)
 %RUN_SPEAKER_DEMO Over-the-air image transfer with level checks and diagnostics.
 %   run_speaker_demo('stress')  No audio device. Sends the real waveform through
 %                               SYNTHETIC reverberant rooms, coloured noise and a
@@ -10,11 +10,37 @@ function result = run_speaker_demo(mode, recordingPath)
 %   run_speaker_demo('file', p) Decode a recording made elsewhere (e.g. a phone
 %                               recording of data/fixed_qpsk_transmit.wav).
 %                               Any rate/format audioread supports; resampled.
+%   run_speaker_demo('prepare') Write the transmit WAV only (for a phone or
+%                               another laptop to play); no sound.
+%   Add 'fec' to any mode for rate-1/2 convolutional coding, e.g.
+%   run_speaker_demo('prepare','fec') and run_speaker_demo('file',p,'fec').
+%   Transmitter and receiver must agree on 'fec'. It halves the data rate.
 % Output: result structure. Raw recordings, MAT files and an E7 diagnostics
 % figure are saved with a timestamp so every live attempt is kept as evidence.
 settings = startup_project();
 if nargin < 1
     mode = 'check';
+end
+isFecFlag = cellfun(@(value) ischar(value) && strcmpi(value, 'fec'), varargin);
+settings.useFec = any(isFecFlag);
+varargin = varargin(~isFecFlag);
+if ~isempty(varargin)
+    recordingPath = varargin{1};
+end
+fecTag = '';
+if settings.useFec
+    fecTag = '_fec';
+    fprintf('FEC on: rate-1/2 K=7 convolutional code with soft Viterbi decoding.\n');
+end
+if strcmp(mode, 'prepare')
+    imageBytes = make_demo_image(settings);
+    [waveform, manifest] = make_audio_transmission(imageBytes, settings);
+    wavPath = fullfile(settings.paths.data, ['speaker', fecTag, '_transmit.wav']);
+    audiowrite(wavPath, waveform, settings.sampleRate);
+    fprintf('Saved %s (%.1f s, %d packets). Play it once; record with margin.\n', ...
+        wavPath, manifest.durationSeconds, manifest.numberOfPackets);
+    result = manifest;
+    return;
 end
 if strcmp(mode, 'stress')
     result = run_stress(settings);
@@ -33,7 +59,7 @@ switch mode
         recording = play_record_audio(waveform, settings);
         sourceText = 'live speaker -> microphone';
     case 'file'
-        assert(nargin >= 2, 'Provide the path of the recording.');
+        assert(exist('recordingPath', 'var') == 1, 'Provide the path of the recording.');
         [recording, fileRate] = audioread(recordingPath);
         recording = mean(recording, 2);
         if fileRate ~= settings.sampleRate
@@ -58,7 +84,7 @@ result.netPayloadBitsPerSecond = summary.packetsPassed * settings.packetPayloadB
 print_summary(summary, result, mode, settings);
 
 timestamp = char(datetime('now', 'Format', 'yyyyMMdd_HHmmss'));
-fileStem = ['speaker_', mode, '_', timestamp];
+fileStem = ['speaker_', mode, fecTag, '_', timestamp];
 audiowrite(fullfile(settings.paths.data, [fileStem, '.wav']), max(min(recording, 1), -1), settings.sampleRate);
 save(fullfile(settings.paths.data, [fileStem, '.mat']), 'recording', 'result', 'manifest', 'settings', 'imageBytes');
 imwrite(result.receivedImage, fullfile(settings.paths.data, [fileStem, '_image.png']));
@@ -74,6 +100,14 @@ fprintf('\n--- %s result ---\n', mode);
 fprintf('Recording peak %.3f of full scale, %d clipped samples.\n', summary.peakLevel, summary.clippedSamples);
 fprintf('Synchronised %d/%d packets; CRC passed %d/%d; BER %.3g.\n', summary.packetsSynchronised, ...
     summary.packetsSent, summary.packetsPassed, summary.packetsSent, result.ber);
+if settings.useFec
+    corrections = cellfun(@(entry) fec_count(entry), result.diagnostics);
+    corrections = corrections(~isnan(corrections));
+    if ~isempty(corrections)
+        fprintf('FEC corrected a median of %g coded bits per packet (max %g).\n', ...
+            median(corrections), max(corrections));
+    end
+end
 fprintf('Median data-carrier SNR %.1f dB; %.0f%% of carriers below 10 dB; EVM %.1f dB.\n', ...
     summary.medianSnrDb, 100 * summary.weakCarrierFraction, summary.evmDb);
 fprintf('Channel energy outside the %.1f ms cyclic prefix: %.1f dB. Latency %.3f s.\n', ...
@@ -102,10 +136,22 @@ else
 end
 end
 
+function count = fec_count(entry)
+%FEC_COUNT Coded-bit corrections stored by decode_audio_frame, NaN if absent.
+count = NaN;
+if isstruct(entry) && isfield(entry, 'fecCorrections')
+    count = entry.fecCorrections;
+end
+end
+
 function result = run_stress(settings)
 %RUN_STRESS Offline prediction: real waveform through synthetic rooms and noise.
 % No audio device is opened. SNR is broadband recording SNR, as in the
 % fixed-QPSK simulation demo; the measured median per-carrier SNR is also kept.
+stressTag = '';
+if settings.useFec
+    stressTag = '_fec';
+end
 imageBytes = make_demo_image(settings);
 [waveform, manifest] = make_audio_transmission(imageBytes, settings);
 roomStream = RandStream('mt19937ar', 'Seed', settings.seed + 20);
@@ -144,8 +190,8 @@ for roomIndex = 1:roomCount
 end
 stressTable = cell2table(rows, 'VariableNames', {'Room', 'Rt60Seconds', 'DrrDb', 'RecordingSnrDb', ...
     'MedianCarrierSnrDb', 'PacketsPassed', 'PacketsSent', 'Ber', 'EvmDb', 'EnergyOutsideCpDb'});
-writetable(stressTable, fullfile(settings.paths.results, 'speaker_stress.csv'));
-save(fullfile(settings.paths.results, 'speaker_stress.mat'), 'stressTable', 'packetSuccess', 'measuredSnrDb', 'settings');
+writetable(stressTable, fullfile(settings.paths.results, ['speaker_stress', stressTag, '.csv']));
+save(fullfile(settings.paths.results, ['speaker_stress', stressTag, '.mat']), 'stressTable', 'packetSuccess', 'measuredSnrDb', 'settings');
 
 figureHandle = figure('Visible', 'off', 'Position', [100, 100, 1200, 450]);
 layout = tiledlayout(figureHandle, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
@@ -175,9 +221,9 @@ ylim(axesHandle, [0, 105]);
 xlabel(axesHandle, 'Receiver-measured median carrier SNR (dB) - compare with ''check''');
 ylabel(axesHandle, 'Packets passing CRC (%)');
 legend(axesHandle, settings.stressRoomNames, 'Location', 'southeast');
-save_figure(figureHandle, 'E7_speaker_stress', settings);
+save_figure(figureHandle, ['E7_speaker_stress', stressTag], settings);
 result.table = stressTable;
 result.packetSuccess = packetSuccess;
 result.measuredSnrDb = measuredSnrDb;
-fprintf('Saved results/speaker_stress.csv and figures/E7_speaker_stress.png\n');
+fprintf('Saved results/speaker_stress%s.csv and figures/E7_speaker_stress%s.png\n', stressTag, stressTag);
 end

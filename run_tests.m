@@ -8,7 +8,7 @@ testFunctions = {@test_modulations, @test_crc, @test_loaded_mapping, ...
     @test_covariance, @test_outage, @test_awgn, @test_psd, ...
     @test_deconvolution, @test_phase_tracking, @test_audio_packet, ...
     @test_sampling_clock, @test_packet_rejection, @test_adaptive_power, ...
-    @test_resample_convolve};
+    @test_resample_convolve, @test_fec};
 names = cell(numel(testFunctions), 1);
 passed = false(numel(testFunctions), 1);
 messages = cell(numel(testFunctions), 1);
@@ -181,6 +181,45 @@ bins = settings.usedBins - mean(settings.usedBins);
 distorted = grid .* exp(1i * (0.3 + 0.002 * bins));
 [corrected, ~] = correct_pilot_phase(distorted, channelEstimate, pilotPositions, settings);
 assert(max(abs(corrected - grid), [], 'all') < 1e-10);
+end
+
+function test_fec(settings)
+% Convolutional code: generator taps, round trip, correction, interleaver,
+% and a full audio packet at an SNR where uncoded QPSK usually fails.
+impulse = fec_encode([true; false(6, 1)]);
+pairs = reshape(impulse, 2, []);
+assert(isequal(pairs(1, 1:7), logical([1 0 1 1 0 1 1])), 'Generator 133 taps.');
+assert(isequal(pairs(2, 1:7), logical([1 1 1 1 0 0 1])), 'Generator 171 taps.');
+stream = RandStream('mt19937ar', 'Seed', settings.seed + 30);
+bits = rand(stream, 576, 1) > 0.5;
+coded = fec_encode(bits);
+assert(numel(coded) == 2 * (576 + 6));
+llr = 1 - 2 * double(coded);
+assert(isequal(fec_decode(llr, 576), bits), 'Noiseless round trip.');
+llr(1:97:end) = -llr(1:97:end); % 12 scattered hard errors
+assert(isequal(fec_decode(llr, 576), bits), 'Scattered errors corrected.');
+permutation = fec_interleaver(1344, settings.fecInterleaverColumns);
+assert(isequal(sort(permutation), (1:1344).'), 'Interleaver is a permutation.');
+positions(permutation) = 1:1344;
+assert(min(abs(diff(positions))) >= 1344 / settings.fecInterleaverColumns, 'Adjacent bits separated.');
+% Audio packet at 4 dB broadband SNR: coded must pass, uncoded mostly fails.
+payload = uint8((0:settings.packetPayloadBytes-1).');
+passes = zeros(1, 2);
+for useFec = [false, true]
+    settings.useFec = useFec;
+    [waveform, metadata] = make_audio_frame(payload, settings);
+    clean = conv(waveform, settings.demoChannel);
+    noiseStream = RandStream('mt19937ar', 'Seed', settings.seed + 31);
+    for trial = 1:5
+        noisy = clean + rms(clean) * 10^(-4 / 20) * randn(noiseStream, numel(clean), 1);
+        decoded = decode_audio_frame([zeros(137, 1); noisy; zeros(5000, 1)], numel(payload), settings);
+        passes(useFec + 1) = passes(useFec + 1) + decoded.passed;
+    end
+    if useFec
+        assert(isequal(decoded.decodedBits, metadata.packetBits));
+    end
+end
+assert(passes(2) == 5 && passes(1) < passes(2), 'FEC must beat uncoded at 4 dB.');
 end
 
 function test_audio_packet(settings)
