@@ -1,9 +1,9 @@
 # Acoustic OFDM viva notebook
 
-This file is maintained with the implementation. The design reference is
-`acoustic_ofdm_PLAN.md`; the user's MATLAB requirements override its Python,
-calendar and stop-after-each-step instructions. No room measurements have yet
-been made. Synthetic channel parameters are assumptions, not fitted measurements.
+Notes for explaining the project out loud: conventions, derivations and a
+worked example for each part. Synthetic channel parameters are assumptions,
+not fitted to measured rooms; no room impulse-response measurements have been
+made yet. Live speaker-to-microphone results are in the main README.
 
 ## Conventions and the packet path
 
@@ -42,7 +42,7 @@ dividing the complex symbol by sqrt(10) therefore gives Es=1. Gray axis labels
 are 00:+3, 01:+1, 11:-1, 10:-3. Demapping uses signs and the threshold 2/sqrt(10).
 For gamma=Es/E|N|², BPSK BER=Q(sqrt(2 gamma)), QPSK BER=Q(sqrt(gamma)).
 The exact Gray 16-QAM BER is 3/4 Q(a)+1/2 Q(3a)-1/4 Q(5a), a=sqrt(gamma/5).
-The plan's first term alone is an approximation and is poor at very low SNR.
+Using only the first term is an approximation, and a poor one at very low SNR.
 CRC-32/ISO-HDLC of ASCII `123456789` is hexadecimal CBF43926. A 64-byte
 payload becomes 68 bytes, or 544 bits. CRC is error detection, not correction.
 
@@ -260,16 +260,14 @@ Zero errors give no bootstrap upper-tail information; NaN upper endpoints
 mark that limitation explicitly. Pointwise intervals do not jointly guarantee
 all plotted values. The theory should usually, not invariably, lie within 95%.
 
-## Scope changes and viva questions to answer candidly
+## Scope and questions to answer candidly
 
-The old Python implementation/calendar/pause gates were overridden. Off mode,
-coloured covariance, defined FFT/energy conventions, explicit packet/CRC
-metrics and independent-frame uncertainty correct gaps in the reference.
-Measured-PDP fitting and adaptive acoustic transmission remain unfinished;
-the matched synthetic prior is not described as a fitted room model. No FEC
-or channel prediction is included. Real hardware and distance tests require
-physical interaction. The reference's anticipated adaptive advantage is a
-hypothesis; the generated results below record what actually happened.
+Things to be upfront about: measured-PDP fitting and adaptive loading over
+real sound are not done, and the matched synthetic prior is not a fitted room
+model. The audio link has optional convolutional coding (the simulation study
+does not use it), and there is no channel prediction. Distance tests are still
+to do. Whether adaptive loading actually helps was treated as a question; the
+generated results below record what happened.
 
 To explain the code orally, start with `trace_one_packet`, then
 `make_audio_frame`/`decode_audio_frame`. For the contribution, follow

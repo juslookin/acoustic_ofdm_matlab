@@ -24,7 +24,7 @@ the plotting/export syntax requires R2020a or newer.
 
 ## Run the complete software project
 
-Clone the repository, or unzip the delivered project:
+Clone the repository, or download it as a ZIP:
 
 ```powershell
 git clone https://github.com/juslookin/acoustic_ofdm_matlab.git
@@ -42,7 +42,7 @@ results = run_all_simulations();
 `config.m` discovers the project root automatically, so moving or cloning the
 folder requires no code edits. `run_all_simulations` already runs the tests;
 calling `run_tests` separately is useful for a quick check. A full run takes a
-few minutes on the validated machine and overwrites reproducible software
+few minutes and overwrites reproducible software
 results. Each experiment resets its own documented RNG seed.
 
 PowerShell batch alternative, starting inside the project folder:
@@ -50,11 +50,6 @@ PowerShell batch alternative, starting inside the project folder:
 ```powershell
 & 'C:\Program Files\MATLAB\R2026a\bin\matlab.exe' -batch "run_all_simulations;"
 ```
-
-The agent's sandbox needed `MATLAB_PREFDIR` redirected to a writable workspace
-folder and MATLAB launched with access to its licensing service. This is an
-execution-environment issue; normal desktop MATLAB does not require changes
-to the modem. No preferences or licence files are bundled.
 
 ## Read and inspect the results
 
@@ -199,7 +194,7 @@ channelResult = run_audio_measurements('channel', 'C:/path/to/sweep_recording.wa
 Offline channel analysis expects the exact sweep defined in `config.m` to
 have been played. Deconvolution uses regularized FFT least squares, with
 latency recorded separately and delays referenced to the strongest arrival.
-This replaces the reference's Farina inverse filter. Band-limited resolution,
+We use this instead of a Farina inverse filter. Band-limited resolution,
 weaker precursor paths and a noise-biased late tail limit delay estimates.
 `measurement_decisions` suggests CP length/pilot spacing; these are estimates,
 not automatic configuration edits or a validated usable-band decision.
@@ -262,15 +257,15 @@ exploratory when sparse; zero observed errors do not prove target compliance.
 Bootstrap zero-event upper endpoints are `NaN`, explicitly unavailable. The
 effective-SNR formula is tested in a separate conditional-error experiment.
 
-Completed: tested simulation, both estimators, three loading policies, outage,
-CRC/BER/goodput, uncertainty, real fixed-QPSK image waveform, offline receiver,
-measurement/replay routines and saved experiments. Remaining: physical room
-measurements, hardware duplex/clock testing, live distance/90% CRC validation,
-measured-PDP statistical fitting, adaptive acoustic probe/feedback, robust
-general file-transfer framing and coding. No hardware function was invoked
-while validating this delivery. Synthetic signals are labelled throughout.
+Done so far: the tested simulation, both estimators, three loading policies,
+outage, CRC/BER/goodput with uncertainty, the real image waveform, the offline
+and live receivers, optional convolutional coding, and the measurement/replay
+routines. Still open: room impulse-response measurements, tests at several
+distances, fitting the delay profile to measured rooms, adaptive loading over
+real sound with feedback, and general file transfer. Synthetic signals are
+labelled as such throughout.
 
-## Source layout and design changes
+## Source layout and design choices
 
 `config.m` is the central configuration. `ofdm/` follows mapping -> IFFT/CP ->
 FFT -> estimation/equalization -> decisions -> CRC. `channel/` separates
@@ -279,13 +274,14 @@ waveforms and synchronization. `measure/` estimates PSD, FIR and variation.
 `experiments/` saves figures/tables. `statistics/` contains interval routines.
 `run_tests.m` contains focused deterministic and statistical checks.
 
-Changes to the reference: MATLAB replaces Python; calendar/stop gates removed;
-off mode added; coloured covariance and FFT/power conventions made explicit;
-exact Gray 16-QAM theory used; CRC packet sizes fixed; feasible probe timing;
-regularized deconvolution replaces Farina inversion; separate complex/real
-channel models; statistical uncertainty uses independent channel frames;
-effective-SNR/adaptive advantage treated as hypotheses. Hardware-dependent
-results and adaptive acoustic transmission remain outside completed scope.
+A few choices worth knowing about: carriers can be switched off entirely
+when they are too weak; coloured noise covariance and the FFT/power
+conventions are stated explicitly; the exact Gray 16-QAM error formula is used
+rather than an approximation; channel impulse responses are estimated with
+regularized deconvolution; complex fading (for simulation) and real FIR rooms
+(for audio) are separate models; and uncertainty is computed over independent
+channel frames. The effective-SNR formula and the benefit of adaptive loading
+are treated as things to test, not assumptions.
 
 Official MATLAB references: [FFT](https://www.mathworks.com/help/matlab/ref/fft.html),
 [IFFT](https://www.mathworks.com/help/matlab/ref/ifft.html),

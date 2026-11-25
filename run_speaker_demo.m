@@ -231,8 +231,12 @@ save(fullfile(settings.paths.results, ['speaker_stress', stressTag, '.mat']), 's
 
 figureHandle = figure('Visible', 'off', 'Position', [100, 100, 1200, 450]);
 layout = tiledlayout(figureHandle, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-title(layout, sprintf(['E7 stress test: real fixed-QPSK waveform, SYNTHETIC rooms, AR(1) noise, ', ...
-    '%d ppm clock offset, %d packets'], settings.stressClockPpm, manifest.numberOfPackets));
+codingText = 'uncoded QPSK';
+if settings.useFec
+    codingText = 'QPSK + rate-1/2 convolutional code';
+end
+title(layout, sprintf(['E7 stress test: real waveform (%s), SYNTHETIC rooms, AR(1) noise, ', ...
+    '%d ppm clock offset, %d packets'], codingText, settings.stressClockPpm, manifest.numberOfPackets));
 legendText = cell(roomCount, 1);
 for roomIndex = 1:roomCount
     if isinf(settings.stressRoomDrrDb(roomIndex))

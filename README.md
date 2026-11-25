@@ -156,6 +156,11 @@ the room, a longer guard time for echoey rooms, and colour pictures.
 
 ## More detail
 
+- [docs/theory.pdf](docs/theory.pdf): the theory behind every block, from
+  OFDM and the cyclic prefix to Viterbi decoding, with worked examples
+  (LaTeX source in `docs/theory.tex`).
+- [docs/presentation_script.pdf](docs/presentation_script.pdf): talk script,
+  demo steps and likely questions.
 - [docs/TECHNICAL.md](docs/TECHNICAL.md): the full technical reference
   (signal design, simulations, statistics, measurement tools).
 - [docs/VIVA_NOTES.md](docs/VIVA_NOTES.md): equations and worked examples.
