@@ -1,7 +1,4 @@
 function result = run_audio_measurements(measurement, recordingPath)
-%RUN_AUDIO_MEASUREMENTS Entry point: 'noise', 'channel', 'variation', 'tones'.
-% Optional recordingPath WAV enables offline noise/channel/tones analysis.
-% Without it this function performs physical audio I/O. Raw data are saved.
 settings = startup_project();
 if nargin < 1
     measurement = 'noise';
@@ -16,9 +13,11 @@ if strcmp(measurement, 'channel')
 elseif strcmp(measurement, 'tones')
     time = (0:round(settings.toneDuration * settings.sampleRate)-1).' / settings.sampleRate;
     probe = zeros(numel(time), 1);
+
     for frequencyHz = settings.toneFrequencies
         probe = probe + settings.audioPeak / numel(settings.toneFrequencies) * sin(2 * pi * frequencyHz * time);
     end
+
     playback = probe;
 elseif strcmp(measurement, 'noise')
     probe = [];
@@ -59,7 +58,6 @@ else
     [frequencies, psd] = welch_psd(recording, settings.sampleRate, settings.psdWindowLength, settings.psdOverlapFraction);
     result.frequencies = frequencies;
     result.psd = psd;
-    % One-sided real PSD -> positive-bin unitary FFT variance: fs*S1(f)/2.
     result.positiveBinNoiseVariance = settings.sampleRate / 2 * interp1(frequencies, psd, settings.usedBins * settings.sampleRate / settings.fftSize, 'linear');
     if strcmp(measurement, 'tones')
         result.toneReport = analyze_tones(recording, probe, settings);

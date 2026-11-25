@@ -1,9 +1,8 @@
 function settings = startup_project()
-%STARTUP_PROJECT Add project subfolders and create output directories.
-% Input: none. Output: settings structure, with absolute file paths.
 projectRoot = fileparts(mfilename('fullpath'));
 addpath(genpath(projectRoot));
 settings = config();
+
 directoryNames = fieldnames(settings.paths);
 for directoryIndex = 1:numel(directoryNames)
     directoryPath = settings.paths.(directoryNames{directoryIndex});

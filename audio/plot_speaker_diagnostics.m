@@ -1,14 +1,11 @@
 function figureHandle = plot_speaker_diagnostics(result, summary, imageBytes, settings, label)
-%PLOT_SPEAKER_DIAGNOSTICS One-page summary of an over-the-air (or file) run.
-% Inputs: decode result, summarize_audio_result output, transmitted uint8
-% image, settings, label text. Output: invisible figure handle (caller saves).
 figureHandle = figure('Visible', 'off', 'Position', [100, 100, 1400, 800]);
 layout = tiledlayout(figureHandle, 2, 3, 'TileSpacing', 'compact', 'Padding', 'compact');
 title(layout, sprintf('%s | peak %.2f FS, %d clipped samples | BER %.2g (known bits)', ...
     label, summary.peakLevel, summary.clippedSamples, summary.ber), 'Interpreter', 'none');
-
 axesHandle = nexttile(layout);
 imagesc(axesHandle, imageBytes, [0, 255]);
+
 colormap(axesHandle, gray);
 axis(axesHandle, 'image', 'off');
 title(axesHandle, 'Transmitted image');
@@ -30,13 +27,14 @@ else
         'o', 'Color', [0.10, 0.55, 0.20], 'DisplayName', 'CRC pass');
     plot(axesHandle, attempt(~summary.packetPassed), summary.packetMedianSnrDb(~summary.packetPassed), ...
         'x', 'Color', [0.80, 0.10, 0.10], 'MarkerSize', 9, 'LineWidth', 1.5, 'DisplayName', 'CRC fail');
+
     grid(axesHandle, 'on');
     xlabel(axesHandle, 'Packet (decode order)');
     ylabel(axesHandle, 'Median data-carrier SNR (dB)');
+
     title(axesHandle, sprintf('%d/%d packets synchronised', summary.packetsSynchronised, summary.packetsSent));
     legend(axesHandle, 'Location', 'best');
 end
-
 axesHandle = nexttile(layout);
 if all(isnan(summary.binSnrDb))
     show_message(axesHandle, 'No SNR estimate');
@@ -54,7 +52,6 @@ else
         summary.medianSnrDb, 100 * summary.weakCarrierFraction));
     legend(axesHandle, 'Location', 'best');
 end
-
 axesHandle = nexttile(layout);
 if isempty(summary.constellation)
     show_message(axesHandle, 'No equalized symbols');
@@ -71,7 +68,6 @@ else
     ylabel(axesHandle, 'Quadrature');
     title(axesHandle, sprintf('Equalized QPSK data, EVM %.1f dB', summary.evmDb));
 end
-
 axesHandle = nexttile(layout);
 if isempty(summary.delayMs)
     show_message(axesHandle, 'No channel estimate');
@@ -88,7 +84,6 @@ end
 end
 
 function show_message(axesHandle, message)
-%SHOW_MESSAGE Placeholder text in an empty diagnostics tile.
 axis(axesHandle, 'off');
 text(axesHandle, 0.5, 0.5, message, 'HorizontalAlignment', 'center', 'FontSize', 12);
 end

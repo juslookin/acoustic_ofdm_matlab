@@ -1,6 +1,4 @@
 function statistics = delay_statistics(impulseResponse, sampleRate)
-%DELAY_STATISTICS Energy-weighted delays relative to the supplied first tap.
-% Inputs: real/complex FIR [L x 1], fs Hz. Output: seconds, Hz and normalized PDP.
 power = abs(impulseResponse(:)).^2;
 assert(sum(power) > 0, 'Zero impulse response.');
 power = power / sum(power);

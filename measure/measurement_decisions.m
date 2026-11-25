@@ -1,6 +1,4 @@
 function decisions = measurement_decisions(statistics, settings)
-%MEASUREMENT_DECISIONS Recommendations from measured delay energy; no auto edits.
-% Inputs: delay statistics and settings. Output: explicit provisional decisions.
 decisions.recommendedPrefixSamples = ceil(statistics.energy99Seconds * settings.sampleRate);
 decisions.currentPrefixSamples = settings.cyclicPrefixLength;
 decisions.maximumPilotSpacingApprox = max(1, floor(statistics.coherenceBandwidthHz / (settings.sampleRate / settings.fftSize)));

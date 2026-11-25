@@ -1,11 +1,9 @@
 function [waveform, metadata] = make_audio_frame(payloadBytes, settings)
-%MAKE_AUDIO_FRAME Fixed-QPSK real packet: chirp, guard, two training, data.
-% Input: payloadBytes uint8 [L x 1], settings. Output: waveform [samples x 1]
-% real full-scale units; metadata has packet bits, gain and slot counts.
 [pilotPositions, dataPositions] = carrier_layout(numel(settings.usedBins), settings.pilotSpacing);
 packetBits = make_packet(payloadBytes);
 bitsPerOfdmSymbol = 2 * numel(dataPositions);
 numberOfDataSymbols = audio_data_symbols(numel(packetBits), settings);
+
 if settings.useFec
     codedBits = fec_encode(packetBits);
     paddedBits = [codedBits; false(numberOfDataSymbols * bitsPerOfdmSymbol - numel(codedBits), 1)];
@@ -13,16 +11,20 @@ if settings.useFec
 else
     paddedBits = [packetBits; false(numberOfDataSymbols * bitsPerOfdmSymbol - numel(packetBits), 1)];
 end
+
 dataGrid = zeros(numel(settings.usedBins), numberOfDataSymbols);
 dataGrid(pilotPositions, :) = sqrt(settings.pilotEnergy);
 dataGrid(dataPositions, :) = reshape(sqrt(settings.symbolEnergy) * modulate_bits(paddedBits, 2), numel(dataPositions), []);
+
 training = repmat(training_symbols(settings), 1, settings.trainingSymbols);
 ofdmWaveform = ofdm_modulate([training, dataGrid], settings, true);
 preamble = make_chirp(settings.preambleDuration, settings.preambleStartHz, settings.preambleEndHz, settings.sampleRate, false);
+
 guard = zeros(round(settings.preambleGuardSeconds * settings.sampleRate), 1);
 unscaledWaveform = [preamble; guard; ofdmWaveform];
 transmitGain = settings.audioPeak / max(abs(unscaledWaveform));
 waveform = transmitGain * unscaledWaveform;
+
 metadata.packetBits = packetBits;
 metadata.transmitGain = transmitGain;
 metadata.numberOfDataSymbols = numberOfDataSymbols;

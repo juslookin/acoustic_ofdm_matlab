@@ -1,9 +1,4 @@
 function [ber, interval] = symbol_ber_interval(errorMask, bitsPerSymbol, confidenceZ)
-%SYMBOL_BER_INTERVAL BER uncertainty with each independent symbol as a cluster.
-% Inputs: errorMask [bits x 1] logical, modulation order 1/2/4, normal quantile.
-% Outputs: BER scalar, [lower,upper] 95% interval. For BPSK/QPSK, independent
-% bit decisions permit Wilson. For QAM, bits sharing an axis are dependent;
-% use the CLT across independent symbols. Zero-error upper limits are NaN.
 ber = mean(errorMask);
 if bitsPerSymbol <= 2
     interval = wilson_interval(nnz(errorMask), numel(errorMask), confidenceZ);

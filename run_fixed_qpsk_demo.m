@@ -1,16 +1,14 @@
 function result = run_fixed_qpsk_demo(mode, recordingPath)
-%RUN_FIXED_QPSK_DEMO Image-to-sound demo; default mode uses a synthetic room.
-% Inputs: mode 'simulation' (default), 'hardware', 'file', or 'prepare';
-% recordingPath WAV file for 'file'. Output: result structure, saved artifacts.
-% 'hardware' requires speaker/microphone interaction; it is never run by tests.
 settings = startup_project();
 if nargin < 1
     mode = 'simulation';
 end
+
 rng(settings.seed + 6, 'twister');
 imageBytes = make_demo_image(settings);
 [waveform, manifest] = make_audio_transmission(imageBytes, settings);
 audiowrite(fullfile(settings.paths.data, 'fixed_qpsk_transmit.wav'), waveform, settings.sampleRate);
+
 save(fullfile(settings.paths.data, 'fixed_qpsk_manifest.mat'), 'manifest', 'settings', 'imageBytes');
 if strcmp(mode, 'prepare')
     result = manifest;

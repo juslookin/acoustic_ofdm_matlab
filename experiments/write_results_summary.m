@@ -1,11 +1,10 @@
 function write_results_summary(results, settings, runtime)
-%WRITE_RESULTS_SUMMARY Write actual numerical observations and refresh viva tail.
-% Inputs: experiment result structure, settings, runtime inventory. Output: files.
 reportPath = fullfile(settings.paths.results, 'RESULTS.md');
 fileId = fopen(reportPath, 'w');
 assert(fileId >= 0, 'Cannot write results summary.');
 cleanup = onCleanup(@() fclose(fileId));
 fprintf(fileId, '# Recorded software results\n\n');
+
 fprintf(fileId, 'Run: %s. MATLAB %s. Seed %d. Elapsed %.1f s.\n\n', runtime.runTimestamp, runtime.matlabVersion, settings.seed, results.elapsedSeconds);
 fprintf(fileId, 'All %d software tests passed. No speaker/microphone experiment was performed.\n\n', height(results.tests));
 fprintf(fileId, '## AWGN validation\n\n');

@@ -1,6 +1,4 @@
 function carrierSymbols = ofdm_demodulate(waveform, settings)
-%OFDM_DEMODULATE Remove CP then unitary FFT; transmitter timing is required.
-% Input: waveform [(N+CP)*ofdmSymbols x 1]. Output: [usedCarriers x ofdmSymbols].
 symbolLength = settings.fftSize + settings.cyclicPrefixLength;
 assert(mod(numel(waveform), symbolLength) == 0, 'Incomplete OFDM block.');
 withPrefix = reshape(waveform, symbolLength, []);
