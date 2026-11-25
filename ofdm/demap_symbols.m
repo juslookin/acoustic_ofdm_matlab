@@ -1,16 +1,4 @@
-function bits = demap_symbols(symbols, bitsPerSymbol)
-symbols = symbols(:);
-assert(any(bitsPerSymbol == [1, 2, 4]), 'Unsupported modulation.');
-bitGroups = false(numel(symbols), bitsPerSymbol);
-bitGroups(:, 1) = real(symbols) < 0;
-
-if bitsPerSymbol == 2
-    bitGroups(:, 2) = imag(symbols) < 0;
-elseif bitsPerSymbol == 4
-    bitGroups(:, 2) = abs(real(symbols)) < 2 / sqrt(10);
-    bitGroups(:, 3) = imag(symbols) < 0;
-    bitGroups(:, 4) = abs(imag(symbols)) < 2 / sqrt(10);
-end
-
-bits = reshape(bitGroups.', [], 1);
+function bits = demap_symbols(symbols)
+bits = [real(symbols(:)).'; imag(symbols(:)).'] < 0;
+bits = bits(:);
 end

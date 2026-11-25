@@ -45,7 +45,7 @@ if settings.useFec
     codedLength = 2 * (packetLengthBits + 6);
     fecCorrections = nnz((deinterleaved(1:codedLength) < 0) ~= fec_encode(decodedBits));
 else
-    decodedBits = demap_symbols(equalized(:), 2);
+    decodedBits = demap_symbols(equalized);
 end
 
 [passed, bytes] = check_packet(decodedBits(1:packetLengthBits));

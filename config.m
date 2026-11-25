@@ -10,39 +10,21 @@ settings.usedBins = (43:170).'; % zero-based
 settings.pilotSpacing = 4;
 settings.pilotEnergy = 1;
 settings.symbolEnergy = 1;
-settings.chunkSize = 8;
-settings.targetBer = 1e-3;
-settings.modulationBits = [0, 1, 2, 4];
-settings.packetPayloadBytes = 64;
-settings.crcBits = 32;
-settings.useFec = false;
-settings.fecInterleaverColumns = 16;
-settings.imageSize = [64, 64];
-settings.dataSymbolsPerFrame = 12;
 settings.trainingSymbols = 2;
 
-% simulation
-settings.channelDelays = [0; 2; 5; 9; 15; 24; 38; 56];
-settings.channelDecaySamples = 18;
-settings.channelTapPowers = exp(-settings.channelDelays / settings.channelDecaySamples);
-settings.channelTapPowers = settings.channelTapPowers / sum(settings.channelTapPowers);
-settings.noiseColourStrength = 2;
-settings.noiseColourFloor = 0.25;
-settings.snrDb = [0, 5, 10, 15, 20, 25, 30];
-settings.pilotSpacings = [2, 4, 8];
-settings.adaptivePilotSpacings = [4, 8];
-settings.estimationRealizations = 4000;
-settings.adaptiveRealizations = 2400;
-settings.awgnBits = 1200000;
-settings.awgnSnrDb = [0, 3, 6, 9, 12];
-settings.effectiveSnrErrorVariances = [0.01, 0.05, 0.2];
-settings.effectiveSnrNoiseDb = [10, 20, 30];
-settings.effectiveSnrSymbols = 300000;
-settings.bootstrapReplicates = 600;
-settings.confidenceZ = 1.95996398454005;
+% packets
+settings.imageSize = [64, 64];
+settings.packetPayloadBytes = 64;
+settings.crcBits = 32;
+settings.targetBer = 1e-3;
+
+% error correction
+settings.useFec = false;
+settings.fecInterleaverColumns = 16;
 
 % audio link
 settings.audioPeak = 0.5;
+settings.audioBits = 16;
 settings.preambleDuration = 0.05;
 settings.preambleStartHz = 1000;
 settings.preambleEndHz = 9000;
@@ -54,20 +36,18 @@ settings.recordLeadSeconds = 0.25;
 settings.recordTailSeconds = 0.5;
 settings.audioInputDevice = -1;
 settings.audioOutputDevice = -1;
-settings.audioBits = 16;
+
+% receiver
 settings.syncThreshold = 0.12;
 settings.syncRelativeThreshold = 0.65;
 settings.syncSearchRadius = settings.cyclicPrefixLength;
+settings.timingBackoffSamples = 32;
 settings.equalizerFloor = 1e-12;
 settings.noiseSmoothingBins = 9;
 settings.noiseVarianceFloor = 1e-10;
 settings.phaseFitMinimumPilots = 4;
 settings.phasePilotRelativeFloor = 0.1;
-settings.demoSnrDb = 32;
 settings.demoChannel = [1; zeros(23, 1); 0.25; zeros(35, 1); -0.12];
-settings.demoDelaySamples = 137;
-settings.demoNoiseCoefficient = 0.7;
-settings.timingBackoffSamples = 32;
 
 % speaker demo
 settings.speakerCheckPackets = 3;
@@ -75,31 +55,6 @@ settings.listenMarginSeconds = 25;
 settings.speakerQuietPeak = 0.05;
 settings.speakerClipLevel = 0.99;
 settings.speakerGoodSnrDb = 15;
-settings.stressSnrDb = [10, 15, 20, 25, 30, 40];
-settings.stressClockPpm = 20;
-settings.stressRoomNames = {'Direct path only', 'Desk 0.3 m', 'Room 1 m', 'Room 2 m'};
-settings.stressRoomRt60 = [0, 0.3, 0.4, 0.5];
-settings.stressRoomDrrDb = [Inf, 12, 4, -2];
-
-% measurements
-settings.noiseRecordingSeconds = 30;
-settings.psdWindowLength = 4096;
-settings.psdOverlapFraction = 0.5;
-settings.sweepDuration = 2;
-settings.sweepStartHz = 100;
-settings.sweepEndHz = 18000;
-settings.sweepTailSeconds = 0.4;
-settings.sweepRegularization = 1e-6;
-settings.impulseResponseSeconds = 0.08;
-settings.variationProbeDuration = 0.12;
-settings.variationRepetitions = 20;
-settings.variationRequestedInterval = 0.75;
-settings.variationTailSeconds = 0.20;
-settings.variationRecordLeadSeconds = 0.05;
-settings.variationRecordTailSeconds = 0.05;
-settings.coherenceThreshold = 0.5;
-settings.toneDuration = 0.5;
-settings.toneFrequencies = [1000, 5000];
 
 % folders
 settings.paths.figures = fullfile(settings.projectRoot, 'figures');

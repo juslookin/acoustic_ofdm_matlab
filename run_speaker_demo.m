@@ -44,10 +44,6 @@ if strcmp(mode, 'prepare')
 
     return;
 end
-if strcmp(mode, 'stress')
-    result = run_stress(settings, imageBytes);
-    return;
-end
 if strcmp(mode, 'check')
     imageBytes = imageBytes(:, 1:settings.speakerCheckPackets);
 end
@@ -86,7 +82,7 @@ switch mode
         [~, fileName, fileExtension] = fileparts(recordingPath);
         sourceText = ['file ', fileName, fileExtension];
     otherwise
-        error('Unknown mode. Use stress, check, image, prepare, listen or file.');
+        error('Unknown mode. Use check, image, prepare, listen or file.');
 end
 rawRecording = recording;
 if any(strcmp(mode, {'file', 'listen'}))
@@ -157,86 +153,4 @@ count = NaN;
 if isstruct(entry) && isfield(entry, 'fecCorrections')
     count = entry.fecCorrections;
 end
-end
-
-function result = run_stress(settings, imageBytes)
-stressTag = '';
-if settings.useFec
-    stressTag = '_fec';
-end
-[waveform, manifest] = make_audio_transmission(imageBytes, settings);
-roomStream = RandStream('mt19937ar', 'Seed', settings.seed + 20);
-noiseStream = RandStream('mt19937ar', 'Seed', settings.seed + 21);
-roomCount = numel(settings.stressRoomNames);
-snrCount = numel(settings.stressSnrDb);
-packetSuccess = nan(roomCount, snrCount);
-measuredSnrDb = nan(roomCount, snrCount);
-outsideCpDb = nan(roomCount, 1);
-rows = {};
-for roomIndex = 1:roomCount
-    room = synthetic_room(settings.stressRoomRt60(roomIndex), settings.stressRoomDrrDb(roomIndex), ...
-        settings.sampleRate, roomStream);
-    convolved = fft_convolve(waveform, room);
-    convolved = resample_audio(convolved, settings.sampleRate, ...
-        settings.sampleRate * (1 + settings.stressClockPpm * 1e-6));
-    convolved = [zeros(settings.demoDelaySamples, 1); convolved];
-    noise = filter(1, [1, -settings.demoNoiseCoefficient], randn(noiseStream, numel(convolved), 1));
-    for snrIndex = 1:snrCount
-        snrDb = settings.stressSnrDb(snrIndex);
-        noiseScale = sqrt(mean(convolved.^2) / (mean(noise.^2) * 10^(snrDb / 10)));
-        recording = convolved + noiseScale * noise;
-        decoded = decode_audio_transmission(recording, manifest, settings);
-        summary = summarize_audio_result(decoded, recording, settings);
-        packetSuccess(roomIndex, snrIndex) = summary.packetsPassed / summary.packetsSent;
-        measuredSnrDb(roomIndex, snrIndex) = summary.medianSnrDb;
-        outsideCpDb(roomIndex) = summary.energyOutsideCpDb;
-        rows(end+1, :) = {settings.stressRoomNames{roomIndex}, settings.stressRoomRt60(roomIndex), ...
-            settings.stressRoomDrrDb(roomIndex), snrDb, summary.medianSnrDb, summary.packetsPassed, ...
-            summary.packetsSent, decoded.ber, summary.evmDb, summary.energyOutsideCpDb}; %#ok<AGROW>
-        fprintf('Stress %-16s SNR %2d dB: CRC %2d/%d, carrier SNR %5.1f dB, BER %.3g\n', ...
-            settings.stressRoomNames{roomIndex}, snrDb, summary.packetsPassed, summary.packetsSent, ...
-            summary.medianSnrDb, decoded.ber);
-    end
-end
-stressTable = cell2table(rows, 'VariableNames', {'Room', 'Rt60Seconds', 'DrrDb', 'RecordingSnrDb', ...
-    'MedianCarrierSnrDb', 'PacketsPassed', 'PacketsSent', 'Ber', 'EvmDb', 'EnergyOutsideCpDb'});
-writetable(stressTable, fullfile(settings.paths.results, ['speaker_stress', stressTag, '.csv']));
-save(fullfile(settings.paths.results, ['speaker_stress', stressTag, '.mat']), 'stressTable', 'packetSuccess', 'measuredSnrDb', 'settings');
-figureHandle = figure('Visible', 'off', 'Position', [100, 100, 1200, 450]);
-layout = tiledlayout(figureHandle, 1, 2, 'TileSpacing', 'compact', 'Padding', 'compact');
-codingText = 'uncoded QPSK';
-if settings.useFec
-    codingText = 'QPSK + rate-1/2 convolutional code';
-end
-title(layout, sprintf(['E7 stress test: real waveform (%s), SYNTHETIC rooms, AR(1) noise, ', ...
-    '%d ppm clock offset, %d packets'], codingText, settings.stressClockPpm, manifest.numberOfPackets));
-legendText = cell(roomCount, 1);
-for roomIndex = 1:roomCount
-    if isinf(settings.stressRoomDrrDb(roomIndex))
-        legendText{roomIndex} = settings.stressRoomNames{roomIndex};
-    else
-        legendText{roomIndex} = sprintf('%s (RT60 %.1f s, DRR %+d dB; %.0f dB outside CP)', ...
-            settings.stressRoomNames{roomIndex}, settings.stressRoomRt60(roomIndex), ...
-            settings.stressRoomDrrDb(roomIndex), outsideCpDb(roomIndex));
-    end
-end
-axesHandle = nexttile(layout);
-plot(axesHandle, settings.stressSnrDb, 100 * packetSuccess.', 'o-', 'LineWidth', 1.2);
-grid(axesHandle, 'on');
-ylim(axesHandle, [0, 105]);
-xlabel(axesHandle, 'Broadband recording SNR (dB)');
-ylabel(axesHandle, 'Packets passing CRC (%)');
-legend(axesHandle, legendText, 'Location', 'southeast');
-axesHandle = nexttile(layout);
-plot(axesHandle, measuredSnrDb.', 100 * packetSuccess.', 'o-', 'LineWidth', 1.2);
-grid(axesHandle, 'on');
-ylim(axesHandle, [0, 105]);
-xlabel(axesHandle, 'Receiver-measured median carrier SNR (dB) - compare with ''check''');
-ylabel(axesHandle, 'Packets passing CRC (%)');
-legend(axesHandle, settings.stressRoomNames, 'Location', 'southeast');
-save_figure(figureHandle, ['E7_speaker_stress', stressTag], settings);
-result.table = stressTable;
-result.packetSuccess = packetSuccess;
-result.measuredSnrDb = measuredSnrDb;
-fprintf('Saved results/speaker_stress%s.csv and figures/E7_speaker_stress%s.png\n', stressTag, stressTag);
 end

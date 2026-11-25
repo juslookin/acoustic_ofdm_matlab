@@ -1,12 +1,10 @@
 function report = run_tests()
 settings = startup_project();
 rng(settings.seed, 'twister');
-testFunctions = {@test_modulations, @test_crc, @test_loaded_mapping, ...
-    @test_ofdm, @test_cyclic_prefix, @test_real_channel_consistency, ...
-    @test_covariance, @test_outage, @test_awgn, @test_psd, ...
-    @test_deconvolution, @test_phase_tracking, @test_audio_packet, ...
-    @test_sampling_clock, @test_packet_rejection, @test_adaptive_power, ...
-    @test_resample_convolve, @test_fec, @test_pictures};
+testFunctions = {@test_modulations, @test_crc, @test_ofdm, @test_cyclic_prefix, ...
+    @test_real_channel_consistency, @test_awgn, @test_phase_tracking, ...
+    @test_audio_packet, @test_sampling_clock, @test_packet_rejection, ...
+    @test_resample, @test_fec, @test_pictures};
 names = cell(numel(testFunctions), 1);
 passed = false(numel(testFunctions), 1);
 
@@ -31,21 +29,12 @@ fprintf('All %d tests passed.\n', height(report));
 end
 
 function test_modulations(~)
-for modulationBits = [1, 2, 4]
-    integers = uint8((0:2^modulationBits-1).');
-    groups = false(numel(integers), modulationBits);
-    for bitIndex = 1:modulationBits
-        groups(:, bitIndex) = bitget(integers, modulationBits-bitIndex+1) ~= 0;
-    end
-    bits = reshape(groups.', [], 1);
-    symbols = modulate_bits(bits, modulationBits);
-    assert(isequal(demap_symbols(symbols, modulationBits), bits));
-    assert(abs(mean(abs(symbols).^2) - 1) < 1e-12);
-    distances = abs(symbols - symbols.');
-    minimumDistance = min(distances(distances > 1e-10));
-    [first, second] = find(abs(distances - minimumDistance) < 1e-10);
-    assert(all(sum(groups(first, :) ~= groups(second, :), 2) == 1));
-end
+bits = logical([0 0 0 1 1 0 1 1]).';
+symbols = modulate_bits(bits);
+
+assert(isequal(demap_symbols(symbols), bits));
+assert(all(abs(abs(symbols) - 1) < 1e-12));
+assert(numel(unique(round(symbols, 9))) == 4);
 end
 
 function test_crc(~)
@@ -58,16 +47,8 @@ packet(73) = ~packet(73);
 assert(~check_packet(packet));
 end
 
-function test_loaded_mapping(~)
-loading = [0; 1; 4; 2; 0; 4];
-bits = rand(sum(loading) * 3, 1) > 0.5;
-symbols = map_loaded_frame(bits, loading, 3);
-assert(all(symbols(loading == 0, :) == 0, 'all'));
-assert(isequal(demap_loaded_frame(symbols, loading), bits));
-end
-
 function test_ofdm(settings)
-symbols = modulate_bits(rand(2 * numel(settings.usedBins) * 3, 1) > 0.5, 2);
+symbols = modulate_bits(rand(2 * numel(settings.usedBins) * 3, 1) > 0.5);
 grid = reshape(symbols, numel(settings.usedBins), 3);
 for realWaveform = [false, true]
     waveform = ofdm_modulate(grid, settings, realWaveform);
@@ -100,62 +81,15 @@ response = fft(settings.demoChannel, settings.fftSize);
 assert(max(abs(recovered - response(settings.usedBins+1) .* grid), [], 'all') < 1e-10);
 end
 
-function test_covariance(settings)
-[basis, covariance, ~] = channel_statistics(settings);
-positions = (1:8:numel(settings.usedBins)).';
-pilots = sqrt(2) * exp(1i * (1:numel(positions)).');
-noiseCovariance = 0.1 * toeplitz(0.5.^(0:numel(positions)-1));
-[~, weights, errorCovariance] = estimator_weights(covariance, positions, noiseCovariance, pilots);
-channels = draw_channels(basis, settings.channelTapPowers, 12000);
-noise = chol(noiseCovariance, 'lower') * (randn(numel(positions), 12000) + 1i * randn(numel(positions), 12000)) / sqrt(2);
-observations = channels(positions, :) + noise ./ pilots;
-errors = weights * observations - channels;
-empirical = mean(abs(errors).^2, 'all');
-theory = mean(real(diag(errorCovariance)));
-assert(abs(empirical / theory - 1) < 0.06);
-assert(min(eig(errorCovariance)) > -1e-10);
-end
-
-function test_outage(settings)
-carriers = numel(settings.usedBins);
-[~, dataPositions] = carrier_layout(carriers, settings.pilotSpacing);
-for method = {'naive', 'aware'}
-    loading = select_loading(zeros(carriers, 1), ones(carriers, 1), ones(carriers, 1), dataPositions, settings, method{1});
-    assert(all(loading == 0));
-end
-loading = select_loading(ones(carriers, 1), zeros(carriers, 1), 1e-6 * ones(carriers, 1), dataPositions, settings, 'aware');
-assert(all(loading == 4));
-end
-
 function test_awgn(~)
 symbolSnr = 10^(6 / 10);
-for modulationBits = [1, 2, 4]
-    bits = rand(300000 * modulationBits, 1) > 0.5;
-    symbols = modulate_bits(bits, modulationBits);
-    noise = (randn(size(symbols)) + 1i * randn(size(symbols))) / sqrt(2 * symbolSnr);
-    observed = mean(demap_symbols(symbols + noise, modulationBits) ~= bits);
-    theory = theoretical_ber(symbolSnr, modulationBits);
-    standardError = sqrt(theory * (1 - theory) / numel(bits));
-    assert(abs(observed - theory) < 5 * standardError);
-end
-end
-
-function test_psd(settings)
-noise = 0.2 * randn(200000, 1);
-[frequencies, psd] = welch_psd(noise, settings.sampleRate, 4096, 0.5);
-assert(abs(trapz(frequencies, psd) / var(noise, 1) - 1) < 0.03);
-blocks = reshape(noise(1:settings.fftSize*100), settings.fftSize, 100);
-spectra = fft(blocks, [], 1) / sqrt(settings.fftSize);
-assert(abs(mean(abs(spectra(settings.usedBins+1, :)).^2, 'all') / 0.04 - 1) < 0.05);
-end
-
-function test_deconvolution(settings)
-probe = make_chirp(settings.sweepDuration, settings.sweepStartHz, settings.sweepEndHz, settings.sampleRate, true);
-recording = [zeros(200, 1); conv(probe, settings.demoChannel); zeros(5000, 1)];
-[estimated, statistics] = estimate_impulse_response(probe, recording, settings);
-assert(abs(statistics.strongestArrivalSeconds * settings.sampleRate - 200) <= 1);
-assert(abs(estimated(25) / estimated(1) - 0.25) < 0.08);
-assert(statistics.energy99Seconds <= 0.005);
+bits = rand(600000, 1) > 0.5;
+symbols = modulate_bits(bits);
+noise = (randn(size(symbols)) + 1i * randn(size(symbols))) / sqrt(2 * symbolSnr);
+observed = mean(demap_symbols(symbols + noise) ~= bits);
+theory = 0.5 * erfc(sqrt(symbolSnr / 2));
+standardError = sqrt(theory * (1 - theory) / numel(bits));
+assert(abs(observed - theory) < 5 * standardError);
 end
 
 function test_phase_tracking(settings)
@@ -253,25 +187,11 @@ assert(mean(corrupted ~= packet) < settings.targetBer * 2);
 assert(~check_packet(corrupted));
 end
 
-function test_adaptive_power(settings)
-carriers = numel(settings.usedBins);
-[~, dataPositions] = carrier_layout(carriers, settings.pilotSpacing);
-noise = zeros(numel(dataPositions), settings.dataSymbolsPerFrame);
-payload = uint8(randi([0, 255], 1024, 1));
-metrics = evaluate_adaptive_frame(ones(carriers, 1), zeros(carriers, 1), ones(carriers, 1), ...
-    ones(carriers, 1), dataPositions, noise, payload, settings, 'aware');
-assert(metrics(2) == 0 && metrics(5) == 0 && metrics(6) == 1 && metrics(8) == 0);
-end
-
-function test_resample_convolve(settings)
-signal = randn(5000, 1);
-taps = randn(300, 1);
-assert(max(abs(fft_convolve(signal, taps) - conv(signal, taps))) < 1e-9);
-assert(isequal(size(fft_convolve(signal, 1)), [numel(signal), 1]));
-assert(max(abs(fft_convolve(signal, 1) - signal(:))) < 1e-12);
+function test_resample(settings)
 time = (0:47999).' / settings.sampleRate;
 tone = sin(2 * pi * 3000 * time) .* (0.5 - 0.5 * cos(2 * pi * (0:47999).' / 47999));
 roundTrip = resample_audio(resample_audio(tone, 48000, 44100), 44100, 48000);
+
 assert(numel(roundTrip) == numel(tone));
 assert(max(abs(roundTrip - tone)) < 1e-3);
 end

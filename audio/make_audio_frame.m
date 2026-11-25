@@ -14,7 +14,7 @@ end
 
 dataGrid = zeros(numel(settings.usedBins), numberOfDataSymbols);
 dataGrid(pilotPositions, :) = sqrt(settings.pilotEnergy);
-dataGrid(dataPositions, :) = reshape(sqrt(settings.symbolEnergy) * modulate_bits(paddedBits, 2), numel(dataPositions), []);
+dataGrid(dataPositions, :) = reshape(sqrt(settings.symbolEnergy) * modulate_bits(paddedBits), numel(dataPositions), []);
 
 training = repmat(training_symbols(settings), 1, settings.trainingSymbols);
 ofdmWaveform = ofdm_modulate([training, dataGrid], settings, true);

@@ -30,6 +30,21 @@ Each picture is split into 64 packets of 64 bytes. Every packet carries a
 checksum, so the receiver either gets a packet exactly right or throws it
 away and leaves that strip gray. Nothing is ever shown wrong.
 
+## How it works
+
+1. **Packets.** The picture (4096 bytes) is cut into 64 packets of 64 bytes,
+   each with a number saying which one it is.
+2. **CRC32.** Every packet gets a 32-bit fingerprint. The receiver recomputes
+   it: if it matches, the packet is kept; if not, it is dropped and that
+   column of the picture stays gray.
+3. **Error correction.** A convolutional encoder sends two coded bits for
+   every data bit, and a Viterbi decoder on the other side finds the most
+   likely original, fixing a few wrong bits per packet.
+4. **OFDM.** The bits are played as 128 tones at once between 2 and 8 kHz,
+   two bits per tone (QPSK). A short copy at the start of each chord soaks up
+   echoes. The receiver finds each packet by its opening chirp, learns the
+   room from two known training chords, and uses pilot tones to stay in time.
+
 ## Getting started
 
 You need MATLAB R2020a or newer. It has been run on R2024a (macOS) and R2026a
@@ -39,7 +54,7 @@ You need MATLAB R2020a or newer. It has been run on R2024a (macOS) and R2026a
 run_tests
 ```
 
-All 19 tests should pass in about a minute. Nothing plays sound.
+All 13 tests should pass in under a minute. Nothing plays sound.
 
 ## Try it on one laptop
 
@@ -117,9 +132,8 @@ The sender and receiver must agree: use `'fec'` on both or on neither.
   Sound settings, your speaker, Audio enhancements off).
 - **The recording is silent.** Give MATLAB (or your terminal) microphone
   access in System Settings, Privacy & Security, Microphone.
-- **Larger distances.** We have only tested at close range. In simulation,
-  error correction still copes with an echoey room at about 1 metre, but not
-  at 2 metres.
+- **Larger distances.** We have only tested at close range. Echoes longer
+  than about 5 ms (big, bare rooms) break the link.
 
 Each run saves the raw recording, the decoded picture and a diagnostics
 figure, so you can always go back and look at what happened.
@@ -128,18 +142,18 @@ figure, so you can always go back and look at what happened.
 
 | Folder | What lives there |
 |---|---|
-| `audio/` | Turning packets into sound and back: sync, timing, decoding |
-| `ofdm/` | The modem itself: modulation, checksums, error correction |
+| `ofdm/` | The building blocks: QPSK, OFDM, CRC32, encoder and Viterbi decoder |
+| `audio/` | Turning packets into sound and back: chirp, training, pilots |
+| `demo/` | Making and loading the pictures |
 | `images/` | The pictures you can send |
 | `transmit/` | Ready-to-play sound files, one per picture |
 | `data/` | Recordings and received pictures from real runs |
-| `figures/` | Plots from simulations and live runs |
-| `results/` | Numbers from the simulation experiments |
-| `docs/` | The detailed technical write-up and viva notes |
-| `channel/`, `measure/`, `statistics/`, `experiments/` | Room models, measurement tools and the simulation study |
+| `figures/` | Result figures from live runs |
+| `results/` | Test results |
+| `docs/` | Theory, presentation script and two-device guide (PDFs) |
 
-The main entry points are `run_tests`, `run_speaker_demo` and
-`run_all_simulations` (the full simulation study, a few minutes).
+There are two entry points: `run_speaker_demo` and `run_tests`. All settings
+are in `config.m`.
 
 ## Limits and next steps
 
@@ -156,15 +170,9 @@ the room, a longer guard time for echoey rooms, and colour pictures.
 
 ## More detail
 
-- [docs/theory.pdf](docs/theory.pdf): the theory behind every block, from
-  OFDM and the cyclic prefix to Viterbi decoding, with worked examples
+- [docs/theory.pdf](docs/theory.pdf): how it works, in plain words
   (LaTeX source in `docs/theory.tex`).
 - [docs/presentation_script.pdf](docs/presentation_script.pdf): talk script,
   demo steps and likely questions.
-- [docs/TECHNICAL.md](docs/TECHNICAL.md): the full technical reference
-  (signal design, simulations, statistics, measurement tools).
-- [docs/VIVA_NOTES.md](docs/VIVA_NOTES.md): equations and worked examples.
 - [docs/two_device_guide.pdf](docs/two_device_guide.pdf): a printable
   two-page version of the two-device instructions.
-- [results/RESULTS.md](results/RESULTS.md): the numbers behind the
-  simulation figures.
