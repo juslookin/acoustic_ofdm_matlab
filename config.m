@@ -62,4 +62,11 @@ settings.paths.results = fullfile(settings.projectRoot, 'results');
 settings.paths.data = fullfile(settings.projectRoot, 'data');
 settings.paths.images = fullfile(settings.projectRoot, 'images');
 settings.paths.transmit = fullfile(settings.projectRoot, 'transmit');
+
+folders = struct2cell(settings.paths);
+for k = 1:numel(folders)
+    if ~isfolder(folders{k})
+        mkdir(folders{k});
+    end
+end
 end

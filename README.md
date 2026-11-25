@@ -54,7 +54,7 @@ You need MATLAB R2020a or newer. It has been run on R2024a (macOS) and R2026a
 run_tests
 ```
 
-All 13 tests should pass in under a minute. Nothing plays sound.
+All 11 tests should pass in under a minute. Nothing plays sound.
 
 ## Try it on one laptop
 
@@ -97,7 +97,7 @@ recorder), decode the file afterwards with
 
 The built-in pictures are `checkerboard`, `smiley`, `heart`, `ofdm` and
 `landscape`. They are all 64 by 64 pixels in grayscale, drawn by
-[`make_picture_library`](demo/make_picture_library.m).
+`pictures.makeLibrary` in [pictures.m](pictures.m).
 
 To send your own, drop any PNG into `images/`, then make its sound file:
 
@@ -138,22 +138,23 @@ The sender and receiver must agree: use `'fec'` on both or on neither.
 Each run saves the raw recording, the decoded picture and a diagnostics
 figure, so you can always go back and look at what happened.
 
-## What is in the folders
+## The code
 
-| Folder | What lives there |
+| File | What it does |
 |---|---|
-| `ofdm/` | The building blocks: QPSK, OFDM, CRC32, encoder and Viterbi decoder |
-| `audio/` | Turning packets into sound and back: chirp, training, pilots |
-| `demo/` | Making and loading the pictures |
-| `images/` | The pictures you can send |
-| `transmit/` | Ready-to-play sound files, one per picture |
-| `data/` | Recordings and received pictures from real runs |
-| `figures/` | Result figures from live runs |
-| `results/` | Test results |
-| `docs/` | Theory, presentation script and two-device guide (PDFs) |
+| [packets.m](packets.m) | Bytes to bits, CRC32 checksum, add and check it |
+| [fec.m](fec.m) | Convolutional encoder, Viterbi decoder, bit shuffling |
+| [ofdm.m](ofdm.m) | QPSK, the 128-tone chord, chirp, training chord, pilot timing fix |
+| [transmitter.m](transmitter.m) | Picture to packets to sound |
+| [receiver.m](receiver.m) | Sound to packets to picture |
+| [pictures.m](pictures.m) | The built-in pictures |
+| [run_speaker_demo.m](run_speaker_demo.m) | The demo: play, listen, decode, save results |
+| [run_tests.m](run_tests.m) | 11 quick checks |
+| [trace_one_packet.m](trace_one_packet.m) | Follows one packet through every step |
+| [config.m](config.m) | All settings |
 
-There are two entry points: `run_speaker_demo` and `run_tests`. All settings
-are in `config.m`.
+Folders hold data only: `images/` (pictures), `transmit/` (sound files to
+play), `data/` and `figures/` (results of real runs), `docs/` (PDFs).
 
 ## Limits and next steps
 
